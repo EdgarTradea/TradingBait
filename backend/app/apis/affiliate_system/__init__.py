@@ -1,5 +1,4 @@
 import stripe
-import databutton as db
 from fastapi import APIRouter, HTTPException, Query, Request, Depends
 from pydantic import BaseModel, EmailStr
 from typing import Dict, Any, Optional, List

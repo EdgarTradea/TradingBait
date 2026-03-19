@@ -6,7 +6,6 @@ import pandas as pd
 from collections import defaultdict, Counter
 import numpy as np
 from openai import OpenAI
-import databutton as db
 import json
 import os
 

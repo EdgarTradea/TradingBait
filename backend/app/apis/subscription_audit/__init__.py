@@ -1,5 +1,4 @@
 import stripe
-import databutton as db
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any, Optional, List
@@ -9,7 +8,6 @@ import firebase_admin
 from firebase_admin import credentials, firestore
 from app.libs.firebase_init import initialize_firebase
 import json
-import re
 import os
 
 # Initialize Stripe
@@ -40,10 +38,6 @@ def verify_admin_access(user: AuthorizedUser):
     
     if user.sub not in admin_user_ids and user_email not in admin_emails and user.sub not in admin_emails:
         raise HTTPException(status_code=403, detail="Admin access required")
-
-def sanitize_storage_key(key: str) -> str:
-    """Sanitize storage key to only allow alphanumeric and ._- symbols"""
-    return re.sub(r'[^a-zA-Z0-9._-]', '', key)
 
 class SubscriptionAuditResult(BaseModel):
     user_email: str
@@ -87,8 +81,10 @@ async def subscription_audit_health_check():
         test_doc = db_firestore.collection("system_health").document("subscription_audit_test")
         test_doc.set({"last_check": datetime.utcnow().isoformat()}, merge=True)
         
-        # Test storage
-        db.storage.json.put("subscription_audit_health", {"status": "healthy", "timestamp": datetime.utcnow().isoformat()})
+        # Test storage - write to Firestore
+        db_firestore.collection("system").document("subscription_audit_health").set(
+            {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}, merge=True
+        )
         
         return {
             "status": "healthy",
@@ -140,15 +136,9 @@ async def audit_single_user(user_email: str, user: AuthorizedUser) -> Subscripti
             result.recommendations.append("User not found in Firestore - may need account creation")
             return result
         
-        # 2. Check local subscription storage
-        sanitized_user_id = sanitize_storage_key(user_id.replace('.', '_').replace('@', '_at_'))
-        subscription_key = f"subscription.{sanitized_user_id}"
-        
-        try:
-            local_subscription = db.storage.json.get(subscription_key)
-            result.local_subscription = local_subscription
-        except FileNotFoundError:
-            result.local_subscription = None
+        # 2. Check subscription in Firestore
+        sub_doc = db_firestore.collection("users").document(user_id).collection("subscription").document("stripe").get()
+        result.local_subscription = sub_doc.to_dict() if sub_doc.exists else None
         
         # 3. Check Stripe customer data
         stripe_customer_id = firestore_user_data.get('stripe_customer_id') if firestore_user_data else None
@@ -291,9 +281,6 @@ async def restore_subscription(request: SubscriptionRestoreRequest, user: Author
             )
         
         # Create subscription record
-        sanitized_user_id = sanitize_storage_key(audit_result.user_id.replace('.', '_').replace('@', '_at_'))
-        subscription_key = f"subscription.{sanitized_user_id}"
-        
         subscription_data = {
             "user_id": audit_result.user_id,
             "subscription_type": request.subscription_type,
@@ -309,14 +296,13 @@ async def restore_subscription(request: SubscriptionRestoreRequest, user: Author
             }
         }
         
-        # Add Stripe customer ID if available
-        if audit_result.stripe_customer:
-            subscription_data["stripe_customer_id"] = audit_result.stripe_customer["id"]
-        
-        # Store the subscription
-        db.storage.json.put(subscription_key, subscription_data)
-        
-        pass
+        subscription_data["email"] = request.user_email
+
+        # Store the subscription in Firestore
+        db_firestore = firestore.client()
+        db_firestore.collection("users").document(audit_result.user_id).collection("subscription").document("stripe").set(
+            subscription_data, merge=True
+        )
         
         return SubscriptionRestoreResponse(
             success=True,

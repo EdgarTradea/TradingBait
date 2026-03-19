@@ -7,7 +7,6 @@ import uuid
 import firebase_admin
 from firebase_admin import credentials, firestore
 from app.libs.firebase_init import initialize_firebase
-import databutton as db
 import json
 import os
 

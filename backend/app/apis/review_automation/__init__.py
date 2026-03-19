@@ -1,33 +1,25 @@
 from fastapi import APIRouter, HTTPException
 from datetime import datetime, timedelta
 from typing import Dict, List, Any, Optional
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from app.auth import AuthorizedUser
 
 router = APIRouter(prefix="/review-automation")
+
+# Initialize Firebase
+initialize_firebase()
 
 # ============================================================================
 # AUTOMATED REVIEW SYSTEM
 # ============================================================================
 
-class ReviewScheduler:
-    """Manages automated weekly and monthly trading reviews"""
-    
-    @staticmethod
-    def get_review_schedule_key(user_id: str) -> str:
-        """Get storage key for user's review schedule"""
-        return f"review_schedule_{user_id}"
-    
-    @staticmethod
-    def get_last_review_key(user_id: str, review_type: str) -> str:
-        """Get storage key for last review timestamp"""
-        return f"last_{review_type}_review_{user_id}"
-
 async def should_trigger_weekly_review(user_id: str) -> bool:
     """Check if weekly review should be triggered"""
     try:
-        last_review_key = ReviewScheduler.get_last_review_key(user_id, "weekly")
-        last_review = db.storage.json.get(last_review_key, default={})
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("users").document(user_id).collection("review_schedule").document("weekly").get()
+        last_review = doc.to_dict() if doc.exists else {}
         
         if not last_review.get('timestamp'):
             return True  # Never had a review
@@ -43,8 +35,9 @@ async def should_trigger_weekly_review(user_id: str) -> bool:
 async def should_trigger_monthly_review(user_id: str) -> bool:
     """Check if monthly review should be triggered"""
     try:
-        last_review_key = ReviewScheduler.get_last_review_key(user_id, "monthly")
-        last_review = db.storage.json.get(last_review_key, default={})
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("users").document(user_id).collection("review_schedule").document("monthly").get()
+        last_review = doc.to_dict() if doc.exists else {}
         
         if not last_review.get('timestamp'):
             return True  # Never had a review
@@ -133,8 +126,8 @@ Let's discuss your trading progress and work on areas for improvement. What woul
                 pass
         
         # Record that weekly review was completed
-        last_review_key = ReviewScheduler.get_last_review_key(user_id, "weekly")
-        db.storage.json.put(last_review_key, {
+        db_firestore = firestore.client()
+        db_firestore.collection("users").document(user_id).collection("review_schedule").document("weekly").set({
             "timestamp": datetime.now().isoformat(),
             "patterns_found": len(patterns),
             "coaching_triggered": bool(coaching_data)
@@ -243,8 +236,8 @@ This monthly review provides deeper insights into your trading evolution. Let's 
                 pass
         
         # Record that monthly review was completed
-        last_review_key = ReviewScheduler.get_last_review_key(user_id, "monthly")
-        db.storage.json.put(last_review_key, {
+        db_firestore = firestore.client()
+        db_firestore.collection("users").document(user_id).collection("review_schedule").document("monthly").set({
             "timestamp": datetime.now().isoformat(),
             "patterns_found": len(patterns),
             "performance_summary": performance_summary,
@@ -360,11 +353,11 @@ async def get_review_schedule(user: AuthorizedUser):
     user_id = user.sub
     
     try:
-        weekly_key = ReviewScheduler.get_last_review_key(user_id, "weekly")
-        monthly_key = ReviewScheduler.get_last_review_key(user_id, "monthly")
-        
-        weekly_last = db.storage.json.get(weekly_key, default={})
-        monthly_last = db.storage.json.get(monthly_key, default={})
+        db_firestore = firestore.client()
+        weekly_doc = db_firestore.collection("users").document(user_id).collection("review_schedule").document("weekly").get()
+        monthly_doc = db_firestore.collection("users").document(user_id).collection("review_schedule").document("monthly").get()
+        weekly_last = weekly_doc.to_dict() if weekly_doc.exists else {}
+        monthly_last = monthly_doc.to_dict() if monthly_doc.exists else {}
         
         return {
             "last_weekly_review": weekly_last,

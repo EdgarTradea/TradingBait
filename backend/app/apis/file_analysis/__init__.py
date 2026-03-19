@@ -196,7 +196,6 @@ async def _analyze_with_openai(file_content: bytes, filename: str) -> Dict:
     
     try:
         from openai import OpenAI
-        import databutton as db
         import os
         
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))

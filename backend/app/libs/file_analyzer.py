@@ -1,6 +1,5 @@
 from typing import Dict, List, Optional, Tuple
 from openai import OpenAI
-import databutton as db
 import json
 import pandas as pd
 import os

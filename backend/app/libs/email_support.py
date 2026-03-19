@@ -2,11 +2,14 @@ import os
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from typing import Optional, Dict, Any
 from datetime import datetime
 import uuid
-import json
+
+# Initialize Firebase
+initialize_firebase()
 
 def send_email(to: str, subject: str, html_content: str, text_content: str = None) -> bool:
     """Send email using SMTP configuration"""
@@ -95,8 +98,9 @@ def create_support_ticket(
     }
     
     try:
-        # Store ticket in databutton storage
-        db.storage.json.put(f"support_tickets_{ticket_id}", ticket_data)
+        # Store ticket in Firestore
+        db_firestore = firestore.client()
+        db_firestore.collection("support_tickets").document(ticket_id).set(ticket_data)
         
         # Send ticket to support team
         support_email_sent = send_support_team_email(ticket_data)
@@ -285,24 +289,22 @@ def send_user_confirmation_email(ticket_data: Dict[str, Any]) -> bool:
 def get_ticket_by_id(ticket_id: str) -> Optional[Dict[str, Any]]:
     """Retrieve a support ticket by ID"""
     try:
-        return db.storage.json.get(f"support_tickets_{ticket_id}")
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("support_tickets").document(ticket_id).get()
+        return doc.to_dict() if doc.exists else None
     except Exception:
         return None
 
 def list_recent_tickets(limit: int = 50) -> list:
     """List recent support tickets"""
     try:
-        files = db.storage.json.list()
-        ticket_files = [f for f in files if f.name.startswith('support_tickets_')]
-        
-        tickets = []
-        for file in sorted(ticket_files, key=lambda x: x.name, reverse=True)[:limit]:
-            try:
-                ticket = db.storage.json.get(file.name)
-                tickets.append(ticket)
-            except Exception:
-                continue
-                
-        return tickets
+        db_firestore = firestore.client()
+        docs = db_firestore.collection("support_tickets").stream()
+        tickets = sorted(
+            [doc.to_dict() for doc in docs],
+            key=lambda x: x.get("created_at", ""),
+            reverse=True
+        )
+        return tickets[:limit]
     except Exception:
         return []

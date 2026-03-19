@@ -6,12 +6,15 @@ Provides endpoints for managing prop firm preferences and accessing commission d
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List, Optional, Any
-import databutton as db
-import re
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from app.auth import AuthorizedUser
 from app.libs.prop_firm_commissions import PropFirmCommissions
 
 router = APIRouter(prefix="/prop-firms")
+
+# Initialize Firebase
+initialize_firebase()
 
 # ============================================================================
 # PYDANTIC MODELS
@@ -46,18 +49,6 @@ class CommissionCalculationResponse(BaseModel):
     calculation_method: str
 
 # ============================================================================
-# UTILITY FUNCTIONS
-# ============================================================================
-
-def sanitize_storage_key(key: str) -> str:
-    """Sanitize storage key to only allow alphanumeric and ._- symbols"""
-    return re.sub(r'[^a-zA-Z0-9._-]', '', key)
-
-def get_user_preferences_key(user_id: str) -> str:
-    """Get storage key for user preferences"""
-    return sanitize_storage_key(f"user_preferences_{user_id}")
-
-# ============================================================================
 # PROP FIRM ENDPOINTS
 # ============================================================================
 
@@ -88,8 +79,9 @@ async def get_available_prop_firms(user: AuthorizedUser) -> PropFirmListResponse
         available_firms = PropFirmCommissions.get_available_prop_firms()
         
         # Get user's current selection
-        prefs_key = get_user_preferences_key(user_id)
-        user_prefs = db.storage.json.get(prefs_key, default={})
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("users").document(user_id).collection("preferences").document("prop_firm").get()
+        user_prefs = doc.to_dict() if doc.exists else {}
         current_prop_firm = user_prefs.get('prop_firm', 'custom')
         
         # Get commission info for current selection
@@ -120,18 +112,19 @@ async def set_user_prop_firm_preference(request: PropFirmPreferenceRequest, user
             raise HTTPException(status_code=400, detail=f"Unknown prop firm: {prop_firm}")
         
         # Get or create user preferences
-        prefs_key = get_user_preferences_key(user_id)
-        user_prefs = db.storage.json.get(prefs_key, default={})
-        
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("users").document(user_id).collection("preferences").document("prop_firm").get()
+        user_prefs = doc.to_dict() if doc.exists else {}
+
         # Update prop firm preference
         user_prefs['prop_firm'] = prop_firm
-        
+
         # Handle custom commission rate if provided
         if request.custom_commission_rate is not None and prop_firm == 'custom':
             user_prefs['custom_commission_rate'] = request.custom_commission_rate
-        
+
         # Save preferences
-        db.storage.json.put(prefs_key, user_prefs)
+        db_firestore.collection("users").document(user_id).collection("preferences").document("prop_firm").set(user_prefs)
         
         # Get commission info for response
         commission_info = PropFirmCommissions.get_prop_firm_info(prop_firm)
@@ -206,8 +199,9 @@ async def get_user_prop_firm_preference(user: AuthorizedUser) -> Dict[str, Any]:
         user_id = user.sub
         
         # Get user preferences
-        prefs_key = get_user_preferences_key(user_id)
-        user_prefs = db.storage.json.get(prefs_key, default={})
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("users").document(user_id).collection("preferences").document("prop_firm").get()
+        user_prefs = doc.to_dict() if doc.exists else {}
         prop_firm = user_prefs.get('prop_firm', 'custom')
         
         # Get commission info

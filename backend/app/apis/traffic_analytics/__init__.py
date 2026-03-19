@@ -4,11 +4,15 @@ from fastapi import APIRouter, HTTPException, Query
 from pydantic import BaseModel
 from typing import Dict, Any, List, Optional
 from datetime import datetime, timedelta
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from app.libs.performance_monitoring import get_performance_analytics, get_real_time_stats
 from collections import defaultdict
 
 router = APIRouter(prefix="/traffic-analytics")
+
+# Initialize Firebase
+initialize_firebase()
 
 # Response Models
 class TrafficSummaryResponse(BaseModel):
@@ -309,13 +313,13 @@ async def check_traffic_alerts():
 async def _get_unique_users_for_date(date_str: str) -> int:
     """Get unique users for a specific date"""
     try:
-        # Get all hourly summaries for the date
+        db_firestore = firestore.client()
         unique_users = set()
         for hour in range(24):
             hour_key = f"{hour:02d}"
-            summary_key = f"traffic_summary_{date_str}_{hour_key}"
             try:
-                summary = db.storage.json.get(summary_key, default={})
+                doc = db_firestore.collection("traffic_summaries").document(f"{date_str}_{hour_key}").get()
+                summary = doc.to_dict() if doc.exists else {}
                 # In a real implementation, you'd collect actual user IDs
                 unique_users.update([f"user_{i}" for i in range(summary.get("unique_users", 0))])
             except:
@@ -327,22 +331,23 @@ async def _get_unique_users_for_date(date_str: str) -> int:
 async def _collect_business_events(start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
     """Collect business events from storage"""
     events = []
+    db_firestore = firestore.client()
     current_date = start_date
-    
+
     while current_date <= end_date:
         date_str = current_date.strftime("%Y-%m-%d")
         for hour in range(24):
             hour_key = f"{hour:02d}"
-            detailed_key = f"traffic_analytics_detailed_{date_str}_{hour_key}"
             try:
-                hourly_data = db.storage.json.get(detailed_key, default=[])
+                doc = db_firestore.collection("traffic_detailed").document(f"{date_str}_{hour_key}").get()
+                hourly_data = doc.to_dict().get("records", []) if doc.exists else []
                 for record in hourly_data:
                     if record.get("business_event"):
                         events.append(record)
             except:
                 continue
         current_date += timedelta(days=1)
-    
+
     return events
 
 async def _calculate_daily_active_users(start_date: datetime, end_date: datetime) -> int:
@@ -539,15 +544,16 @@ def _check_alert_triggers(analytics: Dict[str, Any]) -> List[Dict[str, Any]]:
 async def _get_hourly_traffic_trends(start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
     """Get hourly traffic trends"""
     trends = []
+    db_firestore = firestore.client()
     current_time = start_date
-    
+
     while current_time <= end_date:
         date_str = current_time.strftime("%Y-%m-%d")
         hour_str = current_time.strftime("%H")
-        summary_key = f"traffic_summary_{date_str}_{hour_str}"
-        
+
         try:
-            summary = db.storage.json.get(summary_key, default={})
+            doc = db_firestore.collection("traffic_summaries").document(f"{date_str}_{hour_str}").get()
+            summary = doc.to_dict() if doc.exists else {}
             trends.append({
                 "timestamp": current_time.isoformat(),
                 "requests": summary.get("total_requests", 0),
@@ -563,30 +569,31 @@ async def _get_hourly_traffic_trends(start_date: datetime, end_date: datetime) -
                 "error_rate": 0,
                 "avg_response_time": 0
             })
-        
+
         current_time += timedelta(hours=1)
-    
+
     return trends
 
 async def _get_daily_growth_trends(start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
     """Get daily growth trends"""
     trends = []
+    db_firestore = firestore.client()
     current_date = start_date
-    
+
     while current_date <= end_date:
         date_str = current_date.strftime("%Y-%m-%d")
-        
+
         # Aggregate daily data from hourly summaries
         daily_requests = 0
         daily_users = 0
         daily_errors = 0
         hourly_count = 0
-        
+
         for hour in range(24):
             hour_str = f"{hour:02d}"
-            summary_key = f"traffic_summary_{date_str}_{hour_str}"
             try:
-                summary = db.storage.json.get(summary_key, default={})
+                doc = db_firestore.collection("traffic_summaries").document(f"{date_str}_{hour_str}").get()
+                summary = doc.to_dict() if doc.exists else {}
                 daily_requests += summary.get("total_requests", 0)
                 daily_users = max(daily_users, summary.get("unique_users", 0))
                 daily_errors += summary.get("failed_requests", 0)

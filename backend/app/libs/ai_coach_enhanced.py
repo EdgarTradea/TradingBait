@@ -1,7 +1,6 @@
 from typing import Dict, Any, List, Optional
 from datetime import datetime
 from openai import OpenAI
-import databutton as db
 from app.auth import AuthorizedUser
 import os
 

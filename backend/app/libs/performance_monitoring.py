@@ -6,13 +6,16 @@ import logging
 from typing import Dict, Any, Optional, List
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from datetime import datetime, timedelta
-import json
 import uuid
 import asyncio
 from collections import defaultdict
 import hashlib
+
+# Initialize Firebase
+initialize_firebase()
 
 class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
     """Comprehensive traffic analytics and performance monitoring middleware"""
@@ -368,17 +371,14 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
             hour_key = current_time.strftime("%H")
             
             # Store detailed metrics
-            detailed_key = f"traffic_analytics_detailed_{date_key}_{hour_key}"
-            
-            # Get existing detailed metrics
-            try:
-                existing_detailed = db.storage.json.get(detailed_key, default=[])
-            except:
-                existing_detailed = []
-            
+            db_firestore = firestore.client()
+            detail_ref = db_firestore.collection("traffic_detailed").document(f"{date_key}_{hour_key}")
+            detail_doc = detail_ref.get()
+            existing_detailed = detail_doc.to_dict().get("records", []) if detail_doc.exists else []
+
             # Add new metrics
             existing_detailed.extend(self.metrics_buffer)
-            db.storage.json.put(detailed_key, existing_detailed)
+            detail_ref.set({"records": existing_detailed})
             
             # Store aggregated metrics
             await self._store_aggregated_metrics(date_key, hour_key)
@@ -398,8 +398,6 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
     async def _store_aggregated_metrics(self, date_key: str, hour_key: str):
         """Store aggregated hourly metrics"""
         try:
-            aggregated_key = f"traffic_summary_{date_key}_{hour_key}"
-            
             # Calculate aggregations
             total_requests = len(self.metrics_buffer)
             successful_requests = [m for m in self.metrics_buffer if m.get('success', False)]
@@ -444,16 +442,15 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
                 "endpoint_categories": dict(endpoint_categories)
             }
             
-            db.storage.json.put(aggregated_key, summary)
-            
+            db_firestore = firestore.client()
+            db_firestore.collection("traffic_summaries").document(f"{date_key}_{hour_key}").set(summary)
+
         except Exception as e:
             pass
-    
+
     async def _store_session_analytics(self, date_key: str, hour_key: str):
         """Store session analytics data"""
         try:
-            session_key = f"session_analytics_{date_key}_{hour_key}"
-            
             # Get current active sessions summary
             active_sessions_summary = []
             current_time = time.time()
@@ -479,8 +476,9 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
                 "sessions": active_sessions_summary
             }
             
-            db.storage.json.put(session_key, session_analytics)
-            
+            db_firestore = firestore.client()
+            db_firestore.collection("traffic_sessions").document(f"{date_key}_{hour_key}").set(session_analytics)
+
         except Exception as e:
             pass
     
@@ -515,20 +513,20 @@ def get_performance_analytics(hours: int = 24) -> Dict[str, Any]:
         start_time = end_time - timedelta(hours=hours)
         
         all_metrics = []
-        
-        # Collect metrics from storage (updated keys)
+        db_firestore = firestore.client()
+
+        # Collect metrics from Firestore
         current_time = start_time
         while current_time <= end_time:
             date_key = current_time.strftime("%Y-%m-%d")
             hour_key = current_time.strftime("%H")
-            storage_key = f"traffic_analytics_detailed_{date_key}_{hour_key}"
-            
             try:
-                hourly_metrics = db.storage.json.get(storage_key, default=[])
+                doc = db_firestore.collection("traffic_detailed").document(f"{date_key}_{hour_key}").get()
+                hourly_metrics = doc.to_dict().get("records", []) if doc.exists else []
                 all_metrics.extend(hourly_metrics)
             except:
                 pass
-            
+
             current_time += timedelta(hours=1)
         
         if not all_metrics:
@@ -642,9 +640,12 @@ def get_real_time_stats() -> Dict[str, Any]:
         detailed_key = f"traffic_analytics_detailed_{date_key}_{hour_key}"
         summary_key = f"traffic_summary_{date_key}_{hour_key}"
         
+        db_firestore = firestore.client()
+
         # Try to get summary first (more efficient)
         try:
-            summary = db.storage.json.get(summary_key, default={})
+            summary_doc = db_firestore.collection("traffic_summaries").document(f"{date_key}_{hour_key}").get()
+            summary = summary_doc.to_dict() if summary_doc.exists else {}
             if summary:
                 return {
                     "current_hour_requests": summary.get("total_requests", 0),
@@ -659,7 +660,8 @@ def get_real_time_stats() -> Dict[str, Any]:
             pass
         
         # Fallback to detailed metrics
-        current_hour_metrics = db.storage.json.get(detailed_key, default=[])
+        detail_doc = db_firestore.collection("traffic_detailed").document(f"{date_key}_{hour_key}").get()
+        current_hour_metrics = detail_doc.to_dict().get("records", []) if detail_doc.exists else []
         
         if not current_hour_metrics:
             return {

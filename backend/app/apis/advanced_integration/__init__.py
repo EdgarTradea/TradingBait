@@ -1,7 +1,6 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-import databutton as db
 from openai import OpenAI
 import json
 from datetime import datetime, timedelta

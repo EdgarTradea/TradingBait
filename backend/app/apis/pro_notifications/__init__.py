@@ -1,12 +1,15 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import Optional
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from app.auth import AuthorizedUser
-import json
 from datetime import datetime
 
 router = APIRouter(prefix="/pro-notifications")
+
+# Initialize Firebase
+initialize_firebase()
 
 class ProNotificationRequest(BaseModel):
     email: str
@@ -25,9 +28,6 @@ async def signup_for_pro_notifications(request: ProNotificationRequest, user: Au
     Store user preference for Pro tier notifications and discount eligibility
     """
     try:
-        # Get existing preferences or create new
-        existing_preferences = db.storage.json.get("pro_waitlist", default={})
-        
         # Create user preference record
         user_preference = {
             "email": request.email,
@@ -38,12 +38,10 @@ async def signup_for_pro_notifications(request: ProNotificationRequest, user: Au
             "discount_eligible": True,  # Early signups get discount eligibility
             "authenticated_user_id": user.sub
         }
-        
-        # Store preference with user ID as key
-        existing_preferences[request.user_id] = user_preference
-        
-        # Save updated preferences
-        db.storage.json.put("pro_waitlist", existing_preferences)
+
+        # Save preference as individual document
+        db_firestore = firestore.client()
+        db_firestore.collection("pro_waitlist").document(request.user_id).set(user_preference)
         
         return ProNotificationResponse(
             success=True,
@@ -65,9 +63,10 @@ async def check_notification_preference(user_id: str, user: AuthorizedUser):
     Check if user has already signed up for Pro notifications
     """
     try:
-        preferences = db.storage.json.get("pro_waitlist", default={})
-        user_pref = preferences.get(user_id)
-        
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("pro_waitlist").document(user_id).get()
+        user_pref = doc.to_dict() if doc.exists else None
+
         if user_pref:
             return {
                 "signed_up": True,
@@ -96,8 +95,10 @@ async def get_waitlist_stats(user: AuthorizedUser):
     Get Pro waitlist statistics (admin only for now)
     """
     try:
-        preferences = db.storage.json.get("pro_waitlist", default={})
-        
+        db_firestore = firestore.client()
+        docs = list(db_firestore.collection("pro_waitlist").stream())
+        preferences = {doc.id: doc.to_dict() for doc in docs}
+
         total_signups = len(preferences)
         notify_enabled = sum(1 for pref in preferences.values() if pref.get("notify_me", False))
         discount_eligible = sum(1 for pref in preferences.values() if pref.get("discount_eligible", False))

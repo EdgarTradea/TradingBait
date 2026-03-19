@@ -2,7 +2,6 @@
 
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
-import databutton as db
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart

@@ -5,7 +5,6 @@ from fastapi import APIRouter, HTTPException, Response
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel
 from app.auth import AuthorizedUser
-import databutton as db
 from typing import Optional
 import re
 from firebase_admin import firestore

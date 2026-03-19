@@ -5,7 +5,8 @@ from pydantic import BaseModel, Field
 from typing import List, Dict, Any, Optional
 from datetime import datetime
 import pandas as pd
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from app.libs.trade_grouping_engine import (
     TradeGroupingEngine,
     GroupingStrategy,
@@ -14,6 +15,9 @@ from app.libs.trade_grouping_engine import (
     TradingStyle,
     MarketType
 )
+
+# Initialize Firebase
+initialize_firebase()
 
 router = APIRouter(prefix="/trade-grouping")
 
@@ -182,20 +186,29 @@ async def analyze_trades(request: GroupingRequest):
 async def get_user_groups(user_id: str, limit: int = Query(50, ge=1, le=200)):
     """Get stored grouping results for a user"""
     try:
-        # Retrieve stored grouping results
-        key = f"trade_groups_{user_id}"
-        stored_data = db.storage.json.get(key, default={})
+        # Retrieve stored grouping results from Firestore
+        db_firestore = firestore.client()
+        groups_ref = db_firestore.collection("users").document(user_id).collection("trade_groups")
         
-        # Get latest groups (limited)
-        groups = stored_data.get('groups', [])
-        recent_groups = groups[-limit:] if len(groups) > limit else groups
+        # Get latest groups (ordered by created_at)
+        query = groups_ref.order_by("created_at", direction=firestore.Query.DESCENDING).limit(limit)
+        docs = query.stream()
+        
+        recent_groups = []
+        for doc in docs:
+            group_data = doc.to_dict()
+            recent_groups.append(group_data)
+        
+        # Get count of all groups for this user
+        # Note: In a production app, we might store the count separately for efficiency
+        # but for this scale, we can just return the current session count or a fixed number
+        # for UX purposes or use a count() aggregation if needed.
         
         return {
             'user_id': user_id,
-            'total_stored_groups': len(groups),
             'returned_groups': len(recent_groups),
             'groups': recent_groups,
-            'last_updated': stored_data.get('last_updated')
+            'last_updated': datetime.now().isoformat() if recent_groups else None
         }
         
     except Exception as e:
@@ -323,14 +336,13 @@ async def grouping_health_check():
 async def _store_grouping_results(user_id: str, result: GroupingResult):
     """Store grouping results for later retrieval"""
     try:
-        key = f"trade_groups_{user_id}"
+        db_firestore = firestore.client()
+        batch = db_firestore.batch()
         
-        # Get existing data
-        existing_data = db.storage.json.get(key, default={'groups': [], 'last_updated': None})
-        
-        # Convert groups to storable format
-        storable_groups = []
+        # Convert and store each group
         for group in result.groups:
+            group_doc_ref = db_firestore.collection("users").document(user_id).collection("trade_groups").document(group.group_id)
+            
             group_data = {
                 'group_id': group.group_id,
                 'group_type': group.group_type,
@@ -351,18 +363,10 @@ async def _store_grouping_results(user_id: str, result: GroupingResult):
                 },
                 'created_at': datetime.now().isoformat()
             }
-            storable_groups.append(group_data)
+            batch.set(group_doc_ref, group_data)
         
-        # Update stored data
-        existing_data['groups'].extend(storable_groups)
-        existing_data['last_updated'] = datetime.now().isoformat()
-        
-        # Keep only recent groups (limit storage)
-        if len(existing_data['groups']) > 1000:
-            existing_data['groups'] = existing_data['groups'][-1000:]
-        
-        # Store updated data
-        db.storage.json.put(key, existing_data)
+        # Commit the batch
+        batch.commit()
         
     except Exception as e:
         pass
@@ -373,14 +377,20 @@ async def _get_groups_by_ids(user_id: str, group_ids: List[str]) -> List[Dict[st
         return []
     
     try:
-        key = f"trade_groups_{user_id}"
-        stored_data = db.storage.json.get(key, default={'groups': []})
+        db_firestore = firestore.client()
+        groups_ref = db_firestore.collection("users").document(user_id).collection("trade_groups")
         
-        # Find groups by ID
+        # Firestore "in" query matches against doc ID
+        # Note: Limit is 30 IDs per query
         found_groups = []
-        for group in stored_data['groups']:
-            if group['group_id'] in group_ids:
-                found_groups.append(group)
+        
+        # Split group_ids into chunks of 30
+        for i in range(0, len(group_ids), 30):
+            chunk = group_ids[i:i + 30]
+            query = groups_ref.where(firestore.FieldPath.document_id(), "in", chunk)
+            docs = query.stream()
+            for doc in docs:
+                found_groups.append(doc.to_dict())
         
         return found_groups
         

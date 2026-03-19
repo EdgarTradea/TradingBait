@@ -1,15 +1,14 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.auth import AuthorizedUser
-import databutton as db
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-import json
 import statistics
 from collections import defaultdict, Counter
 from openai import OpenAI
 import firebase_admin
 from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from app.libs.trading_calculations import TradeData, parse_datetime_flexible
 from app.libs.analytics_calculations import JournalEntry
 import os
@@ -19,7 +18,8 @@ router = APIRouter(prefix="/pattern-analysis")
 # Initialize OpenAI client
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 
-# Initialize Firestore client
+# Initialize Firebase and Firestore client
+initialize_firebase()
 try:
     firestore_db = firestore.client()
 except Exception as e:
@@ -122,15 +122,6 @@ class CoachingAnalytics(BaseModel):
 # UTILITY FUNCTIONS
 # ============================================================================
 
-def sanitize_storage_key(key: str) -> str:
-    """Sanitize storage key to only allow alphanumeric and ._- symbols"""
-    import re
-    return re.sub(r'[^a-zA-Z0-9._-]', '', key)
-
-def get_user_data_key(user_id: str, data_type: str) -> str:
-    """Generate storage key for user data"""
-    return sanitize_storage_key(f"{data_type}_{user_id}")
-
 def load_user_trades(user_id: str, days_back: int = 30) -> List[TradeData]:
     """Load user trades from Firestore using same logic as frontend"""
     if not firestore_db:
@@ -208,26 +199,27 @@ def load_user_trades(user_id: str, days_back: int = 30) -> List[TradeData]:
 def load_user_journal_entries(user_id: str, days_back: int = 30) -> List[JournalEntry]:
     """Load user journal entries"""
     try:
-        journal_key = get_user_data_key(user_id, "journal_entries")
-        journal_data = db.storage.json.get(journal_key, default=[])
-        
+        db_firestore = firestore.client()
+        docs = db_firestore.collection("journal_entries").document(user_id).collection("entries").stream()
+
         cutoff_date = datetime.now() - timedelta(days=days_back)
         entries = []
-        
-        for entry_data in journal_data:
+
+        for doc in docs:
+            entry_data = doc.to_dict()
             try:
                 entry = JournalEntry.from_dict(entry_data)
                 entry_date = datetime.fromisoformat(entry.date.replace('Z', '+00:00')).replace(tzinfo=None)
-                
+
                 if entry_date >= cutoff_date:
                     entries.append(entry)
-                    
+
             except Exception as e:
                 pass
                 continue
-        
+
         return entries
-        
+
     except Exception as e:
         pass
         return []
@@ -921,14 +913,12 @@ async def create_coaching_session(user_id: str, session_type: str, triggered_by:
     
     # Store session data
     try:
-        sessions_key = get_user_data_key(user_id, "coaching_sessions")
-        existing_sessions = db.storage.json.get(sessions_key, default=[])
-        existing_sessions.append(session.model_dump())
-        db.storage.json.put(sessions_key, existing_sessions)
-        
+        db_firestore = firestore.client()
+        db_firestore.collection("users").document(user_id).collection("coaching_sessions").document(session.session_id).set(session.model_dump())
+
         pass
         return session
-        
+
     except Exception as e:
         pass
         raise
@@ -936,17 +926,13 @@ async def create_coaching_session(user_id: str, session_type: str, triggered_by:
 async def update_coaching_session(user_id: str, session_id: str, updates: Dict[str, Any]) -> bool:
     """Update coaching session status and data"""
     try:
-        sessions_key = get_user_data_key(user_id, "coaching_sessions")
-        sessions = db.storage.json.get(sessions_key, default=[])
-        
-        for i, session in enumerate(sessions):
-            if session.get("session_id") == session_id:
-                sessions[i].update(updates)
-                db.storage.json.put(sessions_key, sessions)
-                return True
-        
+        db_firestore = firestore.client()
+        doc_ref = db_firestore.collection("users").document(user_id).collection("coaching_sessions").document(session_id)
+        if doc_ref.get().exists:
+            doc_ref.update(updates)
+            return True
         return False
-        
+
     except Exception as e:
         pass
         return False
@@ -954,8 +940,9 @@ async def update_coaching_session(user_id: str, session_id: str, updates: Dict[s
 async def get_coaching_analytics(user_id: str) -> CoachingAnalytics:
     """Generate coaching effectiveness analytics"""
     try:
-        sessions_key = get_user_data_key(user_id, "coaching_sessions")
-        sessions = db.storage.json.get(sessions_key, default=[])
+        db_firestore = firestore.client()
+        docs = db_firestore.collection("users").document(user_id).collection("coaching_sessions").stream()
+        sessions = [doc.to_dict() for doc in docs]
         
         if not sessions:
             return CoachingAnalytics(
@@ -1323,9 +1310,10 @@ async def comprehensive_pattern_analysis(
         
         # Store educational content separately
         if educational_content:
-            content_key = get_user_data_key(user_id, "educational_content")
-            content_data = [content.model_dump() for content in educational_content]
-            db.storage.json.put(content_key, content_data)
+            db_firestore = firestore.client()
+            db_firestore.collection("users").document(user_id).collection("educational_content").document("latest").set(
+                {"content": [content.model_dump() for content in educational_content]}
+            )
         
         return response
         
@@ -1340,8 +1328,9 @@ async def get_educational_content(user: AuthorizedUser) -> Dict[str, Any]:
         user_id = user.sub
         
         # Get stored educational content
-        content_key = get_user_data_key(user_id, "educational_content")
-        content_data = db.storage.json.get(content_key, default=[])
+        db_firestore = firestore.client()
+        doc = db_firestore.collection("users").document(user_id).collection("educational_content").document("latest").get()
+        content_data = doc.to_dict().get("content", []) if doc.exists else []
         
         return {
             "content": content_data,

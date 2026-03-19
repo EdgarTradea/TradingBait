@@ -1,15 +1,18 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from openai import OpenAI
-import json
 from datetime import datetime, timedelta
 from app.auth import AuthorizedUser
 import os
 
 router = APIRouter(prefix="/reviews")
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
+
+# Initialize Firebase
+initialize_firebase()
 
 # ============================================================================
 # REVIEWS - CONSOLIDATED AI ENDPOINT
@@ -137,17 +140,23 @@ class MonthlyReviewResponse(BaseModel):
 def get_comprehensive_data(user_id: str, days_back: int) -> Dict[str, Any]:
     """Get all user data for comprehensive review"""
     try:
+        db_firestore = firestore.client()
+
         # Trading data
-        trades_key = f"trades_{user_id}"
-        all_trades = db.storage.json.get(trades_key, default=[])
-        
+        all_trades = []
+        evals = db_firestore.collection(f"users/{user_id}/evaluations").stream()
+        for eval_doc in evals:
+            trade_docs = db_firestore.collection(f"users/{user_id}/evaluations/{eval_doc.id}/trades").stream()
+            for trade_doc in trade_docs:
+                all_trades.append(trade_doc.to_dict())
+
         # Journal data
-        journal_key = f"journal_entries_{user_id}"
-        all_journal = db.storage.json.get(journal_key, default=[])
-        
+        journal_docs = db_firestore.collection("journal_entries").document(user_id).collection("entries").stream()
+        all_journal = [doc.to_dict() for doc in journal_docs]
+
         # Habits data
-        habits_key = f"habits_{user_id}"
-        all_habits = db.storage.json.get(habits_key, default=[])
+        habit_docs = db_firestore.collection("users").document(user_id).collection("habits").stream()
+        all_habits = [doc.to_dict() for doc in habit_docs]
         
         # Filter by time period
         cutoff_date = datetime.now() - timedelta(days=days_back)
