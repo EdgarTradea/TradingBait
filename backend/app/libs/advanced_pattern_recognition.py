@@ -441,7 +441,7 @@ class AdvancedPatternRecognition:
                     trend_direction="stable"
                 )
         except Exception as e:
-            print(f"Error analyzing emotional correlations: {e}")
+            pass
         
         return None
     
@@ -535,7 +535,7 @@ class AdvancedPatternRecognition:
                         trend_direction="stable"
                     ))
         except Exception as e:
-            print(f"Error analyzing time patterns: {e}")
+            pass
         
         return patterns
     
@@ -649,7 +649,7 @@ class AdvancedPatternRecognition:
             return insights
             
         except Exception as e:
-            print(f"Error generating AI insights: {e}")
+            pass
             # Fallback to pattern-based insights
             return self._generate_fallback_insights(patterns)
     

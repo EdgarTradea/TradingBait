@@ -34,7 +34,7 @@ def params_as_json(params: BaseModel | None = None, indent: int | None = None) -
 def _print_instead_of_post(path: str, params: BaseModel | None = None):
     # For local debugging without devx server running
     # NB! Careful to avoid circular print streaming
-    print(f"[notify devx] {path}\n{params_as_json(params, indent=2)}")
+    pass
 
 
 def is_recursive_call() -> bool:

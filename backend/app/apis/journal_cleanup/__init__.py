@@ -38,7 +38,7 @@ async def detect_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
         user_id = user.sub
         corrupted_entries = []
         
-        print(f"🔍 Scanning for corrupted journal entries for user {user_id}")
+        pass
         
         # Check both individual entries and entries list
         # Individual entries pattern: journal_entry_{user_id}_{date}
@@ -59,9 +59,9 @@ async def detect_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
                         corrupted_data=str(entry_data)[:200],  # Limit to first 200 chars
                         error_message=f"Entry {i} in list is not a dict: {type(entry_data)}"
                     ))
-                    print(f"Warning: Found corrupted entry in list at index {i}: {type(entry_data)}")
+                    pass
         except Exception as e:
-            print(f"Error checking entries list: {e}")
+            pass
         
         # Also check for individual date entries that might be corrupted
         # For the specific dates mentioned in the logs
@@ -84,7 +84,7 @@ async def detect_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
                         corrupted_data=str(entry_data)[:200],
                         error_message=f"Individual entry is not a dict: {type(entry_data)}"
                     ))
-                    print(f"Warning: Found corrupted individual entry for {date}: {type(entry_data)}")
+                    pass
                 elif not entry_data.get('date'):
                     corrupted_entries.append(CorruptedEntryInfo(
                         date=date,
@@ -113,7 +113,7 @@ async def detect_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
         )
         
     except Exception as e:
-        print(f"Error detecting corrupted entries: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to detect corrupted entries: {str(e)}")
 
 @router.post("/cleanup-corrupted-entries")
@@ -122,7 +122,7 @@ async def cleanup_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
     try:
         user_id = user.sub
         
-        print(f"🧹 Starting cleanup of corrupted journal entries for user {user_id}")
+        pass
         
         # First detect corrupted entries
         detection_result = await detect_corrupted_entries(user)
@@ -149,7 +149,7 @@ async def cleanup_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
         }
         
         db.storage.json.put(backup_key, backup_data)
-        print(f"✅ Created backup at {backup_key}")
+        pass
         
         fixed_entries = []
         skipped_entries = []
@@ -169,7 +169,7 @@ async def cleanup_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
                         if isinstance(entry, dict):
                             clean_entries.append(entry)
                         else:
-                            print(f"Removing corrupted entry from list: {type(entry)}")
+                            pass
                     
                     # Save the cleaned list
                     db.storage.json.put(entries_key, clean_entries)
@@ -182,13 +182,13 @@ async def cleanup_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
                         # We can't easily "fix" a corrupted individual entry
                         # So we'll document it but leave it for manual review
                         skipped_entries.append(f"Individual entry {corrupted_entry.date}: {corrupted_entry.error_message}")
-                        print(f"Skipped individual corrupted entry for manual review: {corrupted_entry.date}")
+                        pass
                     except Exception as delete_error:
-                        print(f"Error handling individual entry {corrupted_entry.date}: {delete_error}")
+                        pass
                         skipped_entries.append(f"Error processing {corrupted_entry.date}: {delete_error}")
                         
             except Exception as fix_error:
-                print(f"Error fixing entry {corrupted_entry.date}: {fix_error}")
+                pass
                 skipped_entries.append(f"Error fixing {corrupted_entry.date}: {fix_error}")
         
         cleanup_result = CleanupResult(
@@ -206,5 +206,5 @@ async def cleanup_corrupted_entries(user: AuthorizedUser) -> CleanupResponse:
         )
         
     except Exception as e:
-        print(f"Error during cleanup: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to cleanup corrupted entries: {str(e)}")

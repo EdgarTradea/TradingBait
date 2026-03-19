@@ -69,7 +69,7 @@ def calculate_trade_metrics(trade_data: Dict[str, Any]) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error calculating trade metrics: {e}")
+        pass
         return {}
 
 def is_forex_pair(symbol: str) -> bool:
@@ -114,7 +114,7 @@ def process_parsed_trades(trades_data: List[Dict[str, Any]]) -> List[Dict[str, A
             processed_trades.append(processed_trade)
             
         except Exception as e:
-            print(f"Error processing trade: {e}")
+            pass
             # Still include the trade but without calculated metrics
             processed_trades.append(trade)
             

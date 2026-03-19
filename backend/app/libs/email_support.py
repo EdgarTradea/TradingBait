@@ -19,7 +19,7 @@ def send_email(to: str, subject: str, html_content: str, text_content: str = Non
         smtp_pass = os.environ.get("SMTP_PASS")
         
         if not all([smtp_host, smtp_user, smtp_pass]):
-            print("SMTP configuration missing")
+            pass
             return False
 
         # Create email message
@@ -53,7 +53,7 @@ def send_email(to: str, subject: str, html_content: str, text_content: str = Non
                 
         return True
     except Exception as e:
-        print(f"Email sending failed: {e}")
+        pass
         return False
 
 def strip_html_tags(html: str) -> str:
@@ -113,7 +113,7 @@ def create_support_ticket(
         }
         
     except Exception as e:
-        print(f"Error creating support ticket: {e}")
+        pass
         return {
             "success": False,
             "error": str(e),

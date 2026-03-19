@@ -61,9 +61,9 @@ def get_authorized_user(
 
         if user is not None:
             return user
-        print("Request authentication returned no user")
+        pass
     except Exception as e:
-        print(f"Request authentication failed: {e}")
+        pass
 
     if isinstance(request, WebSocket):
         raise WebSocketException(
@@ -114,7 +114,7 @@ def authorize_websocket(
             break
 
     if not token:
-        print(f"Missing bearer {prefix}.<token> in protocols")
+        pass
         return None
 
     return authorize_token(token, auth_configs)
@@ -126,12 +126,12 @@ def authorize_request(
 ) -> User | None:
     auth_header = request.headers.get("authorization")
     if not auth_header:
-        print("Missing header 'authorization'")
+        pass
         return None
 
     token = auth_header.startswith("Bearer ") and auth_header.removeprefix("Bearer ")
     if not token:
-        print("Missing bearer token in 'authorization'")
+        pass
         return None
 
     return authorize_token(token, auth_configs)
@@ -154,7 +154,7 @@ def authorize_token(
         token_iss: str | None = unverified_payload.get("iss")
         token_aud: str | None = unverified_payload.get("aud")
     except Exception as e:
-        print(f"Failed to decode token: {e}")
+        pass
         return None
 
     # Try to validate with each auth config
@@ -169,14 +169,14 @@ def authorize_token(
         )
         
         if token_aud not in audiences:
-            print(f"Audience mismatch: {token_aud} not in {audiences}")
+            pass
             continue
 
         # Validate token with full verification
         try:
             key, alg = get_signing_key(auth_config.jwks_url, token)
         except Exception as e:
-            print(f"Failed to get signing key: {e}")
+            pass
             continue
 
         try:
@@ -187,17 +187,17 @@ def authorize_token(
                 audience=token_aud,
             )
         except jwt.PyJWTError as e:
-            print(f"Failed to decode and validate token: {e}")
+            pass
             continue
 
         # Parse user from payload
         try:
             user = User.model_validate(payload)
-            print(f"User {user.sub} authenticated")
+            pass
             return user
         except Exception as e:
-            print(f"Failed to parse token payload: {e}")
+            pass
             continue
 
-    print("Failed to validate authorization token with any auth config")
+    pass
     return None

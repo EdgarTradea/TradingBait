@@ -114,7 +114,7 @@ def get_comprehensive_business_metrics(
         )
         
     except Exception as e:
-        print(f"Error calculating business metrics: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to calculate business metrics: {str(e)}")
 
 def get_subscription_data(start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
@@ -169,11 +169,11 @@ def get_subscription_data(start_date: datetime, end_date: datetime) -> List[Dict
                 
                 subscriptions.append(subscription_data)
         
-        print(f"Retrieved {len(subscriptions)} subscriptions from Stripe")
+        pass
         return subscriptions
         
     except Exception as e:
-        print(f"Error retrieving subscription data: {e}")
+        pass
         return []
 
 def calculate_mrr_metrics(subscriptions: List[Dict[str, Any]], end_date: datetime) -> MRRMetrics:

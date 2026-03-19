@@ -150,7 +150,7 @@ def get_journal_data(user_id: str, days_back: int = 30) -> List[Dict[str, Any]]:
         return sorted(recent_entries, key=lambda x: x.get('created_at', ''), reverse=True)
         
     except Exception as e:
-        print(f"Error getting journal data: {e}")
+        pass
         return []
 
 def get_habit_data(user_id: str, days_back: int = 30) -> List[Dict[str, Any]]:
@@ -176,7 +176,7 @@ def get_habit_data(user_id: str, days_back: int = 30) -> List[Dict[str, Any]]:
         return processed_habits
         
     except Exception as e:
-        print(f"Error getting habit data: {e}")
+        pass
         return []
 
 def get_trading_performance_correlation(user_id: str, days_back: int = 30) -> Dict[str, Any]:
@@ -210,7 +210,7 @@ def get_trading_performance_correlation(user_id: str, days_back: int = 30) -> Di
         }
         
     except Exception as e:
-        print(f"Error getting trading performance: {e}")
+        pass
         return {'total_trades': 0, 'win_rate': 0, 'total_pnl': 0}
 
 def create_behavioral_analysis_prompt(journal_data: List[Dict], habit_data: List[Dict], performance_data: Dict, analysis_type: str) -> str:
@@ -326,7 +326,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
     user_id = user.sub
     
     try:
-        print(f"🧐 Analyzing behavioral patterns for user {user_id} - Type: {request.analysis_type}")
+        pass
         
         # Get behavioral data
         journal_data = get_journal_data(user_id, request.time_period) if request.include_journal_analysis else []
@@ -465,7 +465,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                 success_metrics=["Daily journal entries", "Enhanced self-awareness"]
             ))
         
-        print(f"✅ Behavioral analysis completed for user {user_id}")
+        pass
         
         return BehavioralAnalysisResponse(
             analysis_summary=f"Analyzed {len(journal_data)} journal entries and {len(habit_data)} habits over {request.time_period} days. {ai_analysis[:100]}..." if ai_analysis else f"Behavioral analysis of {total_data_points} data points shows areas for optimization",
@@ -484,7 +484,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
         )
         
     except Exception as e:
-        print(f"❌ Error in behavioral analysis: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error analyzing behavioral patterns: {str(e)}")
 
 @router.post("/emotional-state")
@@ -493,7 +493,7 @@ async def analyze_emotional_state(request: EmotionalStateRequest, user: Authoriz
     user_id = user.sub
     
     try:
-        print(f"😊 Analyzing emotional state for user {user_id}")
+        pass
         
         # Create emotional analysis prompt
         emotion_prompt = f"""
@@ -587,7 +587,7 @@ Focus on trading psychology and emotional regulation.
         )
         
     except Exception as e:
-        print(f"❌ Error in emotional analysis: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error analyzing emotional state: {str(e)}")
 
 @router.post("/habit-formation")
@@ -596,7 +596,7 @@ async def create_habit_formation_plan(request: HabitFormationRequest, user: Auth
     user_id = user.sub
     
     try:
-        print(f"🎯 Creating habit formation plan for user {user_id}")
+        pass
         
         # Create habit formation prompt
         habit_prompt = f"""
@@ -678,7 +678,7 @@ Focus on trading psychology and performance improvement habits.
         )
         
     except Exception as e:
-        print(f"❌ Error creating habit formation plan: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error creating habit plan: {str(e)}")
 
-print("🧐 Consolidated Behavioral Insights API loaded successfully")
+pass

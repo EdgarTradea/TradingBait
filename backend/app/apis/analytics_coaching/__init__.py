@@ -82,7 +82,7 @@ async def create_performance_review(request: PerformanceReviewRequest) -> Perfor
     Generate comprehensive performance review coaching insights based on trading metrics
     """
     try:
-        print(f"🎯 Creating performance review for {request.time_period} period...")
+        pass
         
         # Create detailed performance analysis prompt
         analysis_prompt = f"""
@@ -182,7 +182,7 @@ async def create_performance_review(request: PerformanceReviewRequest) -> Perfor
         )
         
     except Exception as e:
-        print(f"❌ Error creating performance review: {str(e)}")
+        pass
         raise e
 
 @router.post("/generate-predictive-insights")
@@ -191,7 +191,7 @@ async def generate_predictive_insights(request: PredictiveInsightsRequest) -> Pr
     Generate predictive coaching insights based on historical performance and current trends
     """
     try:
-        print(f"🔮 Generating predictive insights for {request.trading_style} trading style...")
+        pass
         
         # Create predictive analysis prompt
         prediction_prompt = f"""
@@ -274,7 +274,7 @@ async def generate_predictive_insights(request: PredictiveInsightsRequest) -> Pr
         )
         
     except Exception as e:
-        print(f"❌ Error generating predictive insights: {str(e)}")
+        pass
         raise e
 
 @router.post("/analyze-goal-alignment")
@@ -283,7 +283,7 @@ async def analyze_goal_alignment(request: GoalAlignmentRequest) -> GoalAlignment
     Analyze how current performance aligns with stated trading goals
     """
     try:
-        print(f"🎯 Analyzing goal alignment for {request.timeline} timeline...")
+        pass
         
         # Create goal alignment analysis prompt
         alignment_prompt = f"""
@@ -386,7 +386,7 @@ async def analyze_goal_alignment(request: GoalAlignmentRequest) -> GoalAlignment
         )
         
     except Exception as e:
-        print(f"❌ Error analyzing goal alignment: {str(e)}")
+        pass
         raise e
 
 @router.post("/explain-trading-metric")
@@ -395,7 +395,7 @@ async def explain_trading_metric(request: MetricExplanationRequest) -> MetricExp
     Provide conversational explanations of complex trading metrics
     """
     try:
-        print(f"📊 Explaining {request.metric_name} metric for {request.trader_experience_level} trader...")
+        pass
         
         # Create metric explanation prompt
         explanation_prompt = f"""
@@ -480,7 +480,7 @@ async def explain_trading_metric(request: MetricExplanationRequest) -> MetricExp
         )
         
     except Exception as e:
-        print(f"❌ Error explaining trading metric: {str(e)}")
+        pass
         raise e
 
-print("✅ Analytics coaching integration API loaded successfully")
+pass

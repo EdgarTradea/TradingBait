@@ -79,13 +79,13 @@ class Config(BaseModel):
 def parse_extensions(databutton_extensions: str) -> list[Extension]:
     extensions: list[Extension] = []
     if not databutton_extensions:
-        print("No extensions env var")
+        pass
     else:
         extensions = parse_json_list(databutton_extensions, Extension)
         if len(extensions) == 0:
-            print("No extensions found")
+            pass
         else:
-            print(f"Found extensions: {[e.name for e in extensions]}")
+            pass
     return extensions
 
 
@@ -98,7 +98,7 @@ def get_extension(cfg: Config, name: ExtensionType) -> Extension | None:
     if not extensions:
         return None
     if len(extensions) > 1:
-        print(f"WARNING: Got duplicate extension: {extensions}")
+        pass
     return extensions[0]
 
 
@@ -192,7 +192,7 @@ def log_config(
         f"devx_base_path            = {cfg.DEVX_BASE_PATH}",
         f"databutton_extensions     = {cfg.DATABUTTON_EXTENSIONS}",
     ]
-    print("\n".join(lines))
+    pass
 
 
 def validate_config(cfg: Config):
@@ -217,7 +217,7 @@ def validate_config(cfg: Config):
 
     if issues:
         if cfg.ENVIRONMENT == "development":
-            print("\n".join("WARNING:" + msg for msg in issues))
+            pass
         else:
             raise ValueError("; ".join(issues))
 

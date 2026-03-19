@@ -241,7 +241,7 @@ class FifoCalculator:
                     continue
         
         # If no valid price found, log warning and return 0
-        print(f"⚠️ Warning: No valid price found for trade {trade.get('id', 'unknown')}")
+        pass
         return 0.0
     
     def _process_trade(self, trade: FifoTrade) -> FifoResult:

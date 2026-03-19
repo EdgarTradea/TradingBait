@@ -177,7 +177,7 @@ async def audit_single_user(user_email: str, user: AuthorizedUser) -> Subscripti
                 ]
                 
             except Exception as e:
-                print(f"Error retrieving Stripe customer {stripe_customer_id}: {e}")
+                pass
                 result.recommendations.append(f"Error accessing Stripe customer: {e}")
         else:
             # Try to find customer by email in Stripe
@@ -193,7 +193,7 @@ async def audit_single_user(user_email: str, user: AuthorizedUser) -> Subscripti
                     }
                     result.recommendations.append(f"Found Stripe customer but missing link in Firestore: {stripe_customer.id}")
             except Exception as e:
-                print(f"Error searching Stripe customers: {e}")
+                pass
         
         # 4. Determine status and recommendations
         has_local = result.local_subscription is not None
@@ -316,7 +316,7 @@ async def restore_subscription(request: SubscriptionRestoreRequest, user: Author
         # Store the subscription
         db.storage.json.put(subscription_key, subscription_data)
         
-        print(f"Successfully restored subscription for {request.user_email} (user_id: {audit_result.user_id})")
+        pass
         
         return SubscriptionRestoreResponse(
             success=True,

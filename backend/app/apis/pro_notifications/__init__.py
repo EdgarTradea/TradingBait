@@ -52,7 +52,7 @@ async def signup_for_pro_notifications(request: ProNotificationRequest, user: Au
         )
         
     except Exception as e:
-        print(f"Error storing Pro notification preference: {e}")
+        pass
         return ProNotificationResponse(
             success=False,
             message="Something went wrong. Please try again.",
@@ -83,7 +83,7 @@ async def check_notification_preference(user_id: str, user: AuthorizedUser):
             }
             
     except Exception as e:
-        print(f"Error checking notification preference: {e}")
+        pass
         return {
             "signed_up": False,
             "notify_me": False,
@@ -110,7 +110,7 @@ async def get_waitlist_stats(user: AuthorizedUser):
         }
         
     except Exception as e:
-        print(f"Error getting waitlist stats: {e}")
+        pass
         return {
             "total_signups": 0,
             "notify_enabled": 0,

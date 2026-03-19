@@ -63,7 +63,7 @@ def _run_migration(dry_run: bool) -> MigrationResult:
         m = PATTERN_JOURNAL.match(key)
         if not m:
             j_skipped += 1
-            print(f"[journal_migration] SKIP (no user_id): {key}")
+            pass
             continue
         user_id, date = m.group(1), m.group(2)
         try:
@@ -88,7 +88,7 @@ def _run_migration(dry_run: bool) -> MigrationResult:
                 sample_paths.append(path)
         except Exception as e:
             errors.append(f"journal/{key}: {str(e)[:200]}")
-            print(f"[journal_migration] ERROR {key}: {e}")
+            pass
 
     # ─────────────────────────────────────────────────────────────────────────
     # 2. Weekly reviews
@@ -99,7 +99,7 @@ def _run_migration(dry_run: bool) -> MigrationResult:
     for key in weekly_keys:
         m = PATTERN_WEEKLY.match(key)
         if not m:
-            print(f"[journal_migration] SKIP weekly (no match): {key}")
+            pass
             continue
         user_id, review_id = m.group(1), m.group(2)
         try:
@@ -123,7 +123,7 @@ def _run_migration(dry_run: bool) -> MigrationResult:
                 sample_paths.append(path)
         except Exception as e:
             errors.append(f"weekly_review/{key}: {str(e)[:200]}")
-            print(f"[journal_migration] ERROR {key}: {e}")
+            pass
 
     # ─────────────────────────────────────────────────────────────────────────
     # 3. Habit definitions
@@ -154,14 +154,14 @@ def _run_migration(dry_run: bool) -> MigrationResult:
                 sample_paths.append(path)
         except Exception as e:
             errors.append(f"habit_definitions/{key}: {str(e)[:200]}")
-            print(f"[journal_migration] ERROR {key}: {e}")
+            pass
 
     # Final commit
     if not dry_run and batch_count > 0:
         batch.commit()
 
     total = j_migrated + w_migrated + h_migrated
-    print(f"[journal_migration] Done. dry_run={dry_run} total={total} errors={len(errors)}")
+    pass
 
     return MigrationResult(
         dry_run=dry_run,

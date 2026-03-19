@@ -69,7 +69,7 @@ async def repair_user_trades() -> SimpleRepairResponse:
                     'repaired_at': datetime.now().isoformat()
                 })
                 repaired_count += 1
-                print(f"Repaired trade {trade_doc.id}: {open_time} -> {close_time}")
+                pass
         
         return SimpleRepairResponse(
             success=True,
@@ -78,7 +78,7 @@ async def repair_user_trades() -> SimpleRepairResponse:
         )
         
     except Exception as e:
-        print(f"Error: {e}")
+        pass
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Repair failed: {str(e)}")

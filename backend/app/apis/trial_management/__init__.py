@@ -1,5 +1,4 @@
 import stripe
-import databutton as db
 from fastapi import APIRouter, HTTPException, Depends
 from fastapi.responses import JSONResponse
 from pydantic import BaseModel, Field
@@ -62,66 +61,55 @@ TRIAL_LIMITS = {
 
 TRIAL_DURATION_DAYS = 7
 
-# Helper functions
-def get_trial_storage_key(user_id: str) -> str:
-    """Get storage key for trial data"""
-    return f"trial_status.{user_id}"
-
-def get_usage_storage_key(user_id: str) -> str:
-    """Get storage key for usage tracking"""
-    return f"trial_usage.{user_id}"
+# Deprecated storage functions removed
 
 # Helper functions for other APIs to use
 def check_trial_usage_limit(user_id: str, feature_type: str) -> tuple[bool, int]:
     """Helper function to check if user can use a feature. Returns (can_use, remaining)"""
     try:
-        # Get trial status
-        trial_data = db.storage.json.get(get_trial_storage_key(user_id), default={})
+        db_firestore = firestore.client()
+        trial_doc = db_firestore.collection('users').document(user_id).collection('subscription').document('trial').get()
         
-        # If not on trial, allow unlimited access
-        if not trial_data or not trial_data.get('is_trial_active'):
-            return True, 999  # Unlimited
+        if not trial_doc.exists or not trial_doc.to_dict().get('is_trial_active'):
+            return True, 999
+            
+        usage_doc = db_firestore.collection('users').document(user_id).collection('subscription').document('usage').get()
+        usage_data = usage_doc.to_dict() if usage_doc.exists else {}
         
-        # Get current usage
-        usage_data = db.storage.json.get(get_usage_storage_key(user_id), default={})
         current_usage = usage_data.get(f"{feature_type}_used", 0)
         limit = TRIAL_LIMITS.get(feature_type, 0)
         
-        # Habits and journaling are unlimited during trial
         if feature_type in ['habits', 'journaling']:
-            return True, 999  # Unlimited
-        
+            return True, 999
+            
         can_use = current_usage < limit
         remaining = max(0, limit - current_usage)
         
         return can_use, remaining
-        
     except Exception as e:
-        print(f"Error checking trial usage limit: {e}")
-        return True, 999  # Default to allowing on error
+        return True, 999
 
 def update_trial_usage(user_id: str, feature_type: str, increment: int = 1) -> bool:
     """Helper function to update trial usage. Returns success status"""
     try:
-        # Only track usage if user is on trial
-        trial_data = db.storage.json.get(get_trial_storage_key(user_id), default={})
-        if not trial_data or not trial_data.get('is_trial_active'):
-            return True  # No tracking needed for non-trial users
+        db_firestore = firestore.client()
+        trial_ref = db_firestore.collection('users').document(user_id).collection('subscription').document('trial')
+        trial_doc = trial_ref.get()
         
-        # Get current usage
-        usage_data = db.storage.json.get(get_usage_storage_key(user_id), default={})
+        if not trial_doc.exists or not trial_doc.to_dict().get('is_trial_active'):
+            return True
+            
+        usage_ref = db_firestore.collection('users').document(user_id).collection('subscription').document('usage')
+        usage_doc = usage_ref.get()
+        usage_data = usage_doc.to_dict() if usage_doc.exists else {}
+        
         current_count = usage_data.get(f"{feature_type}_used", 0)
         new_count = current_count + increment
         usage_data[f"{feature_type}_used"] = new_count
         
-        # Store updated usage
-        db.storage.json.put(get_usage_storage_key(user_id), usage_data)
-        
-        print(f"Updated trial usage: {feature_type} = {new_count} for user {user_id}")
+        usage_ref.set(usage_data, merge=True)
         return True
-        
     except Exception as e:
-        print(f"Error updating trial usage: {e}")
         return False
 
 @router.options("/status")
@@ -141,16 +129,20 @@ async def options_trial_status() -> JSONResponse:
 async def get_trial_status(user: AuthorizedUser) -> JSONResponse:
     """Get current trial status for the user"""
     try:
-        print(f"Getting trial status for user: {user.sub}")
+        pass
         
         # Get trial data from storage
-        trial_data = db.storage.json.get(get_trial_storage_key(user.sub), default={})
-        usage_data = db.storage.json.get(get_usage_storage_key(user.sub), default={})
+        db_firestore = firestore.client()
+        
+        trial_doc = db_firestore.collection('users').document(user.sub).collection('subscription').document('trial').get()
+        trial_data = trial_doc.to_dict() if trial_doc.exists else {}
+        
+        usage_doc = db_firestore.collection('users').document(user.sub).collection('subscription').document('usage').get()
+        usage_data = usage_doc.to_dict() if usage_doc.exists else {}
         
         # If no trial data exists, check if user has active subscription
         if not trial_data:
             # Check for existing subscription in Firestore
-            db_firestore = firestore.client()
             user_doc = db_firestore.collection("users").document(user.sub).get()
             
             if user_doc.exists:
@@ -225,7 +217,7 @@ async def get_trial_status(user: AuthorizedUser) -> JSONResponse:
             can_cancel=trial_data.get('can_cancel', True)
         )
         
-        print(f"Trial status response: {trial_status}")
+        pass
         return JSONResponse(
             content=trial_status.dict(),
             headers={
@@ -237,7 +229,7 @@ async def get_trial_status(user: AuthorizedUser) -> JSONResponse:
         )
         
     except Exception as e:
-        print(f"Error getting trial status: {e}")
+        pass
         error_response = {
             "user_id": user.sub,
             "is_trial_active": False,
@@ -260,7 +252,7 @@ async def get_trial_status(user: AuthorizedUser) -> JSONResponse:
 async def create_trial_subscription(request: CreateTrialRequest, user: AuthorizedUser) -> Dict[str, Any]:
     """Create a new trial subscription with Stripe"""
     try:
-        print(f"Creating trial subscription for user: {user.sub}, plan: {request.plan_name}")
+        pass
         
         # Check if user already has trial or subscription
         trial_status = await get_trial_status(user)
@@ -322,7 +314,7 @@ async def create_trial_subscription(request: CreateTrialRequest, user: Authorize
             'created_at': trial_start.isoformat()
         }
         
-        db.storage.json.put(get_trial_storage_key(user.sub), trial_data)
+        db_firestore.collection('users').document(user.sub).collection('subscription').document('trial').set(trial_data)
         
         # Initialize usage tracking
         initial_usage = {
@@ -330,9 +322,9 @@ async def create_trial_subscription(request: CreateTrialRequest, user: Authorize
             'evaluations_used': 0,
             'analytics_insights_used': 0
         }
-        db.storage.json.put(get_usage_storage_key(user.sub), initial_usage)
+        db_firestore.collection('users').document(user.sub).collection('subscription').document('usage').set(initial_usage)
         
-        print(f"Created trial subscription: {subscription.id}")
+        pass
         
         return {
             'success': True,
@@ -343,17 +335,20 @@ async def create_trial_subscription(request: CreateTrialRequest, user: Authorize
         }
         
     except Exception as e:
-        print(f"Error creating trial subscription: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to create trial: {str(e)}")
 
 @router.post("/track-usage")
 async def track_feature_usage(request: TrialUsageUpdate, user: AuthorizedUser) -> Dict[str, Any]:
     """Track usage of trial features"""
     try:
-        print(f"Tracking usage for user {user.sub}: {request.feature_type} +{request.increment}")
+        pass
         
         # Get current usage
-        usage_data = db.storage.json.get(get_usage_storage_key(user.sub), default={})
+        db_firestore = firestore.client()
+        usage_ref = db_firestore.collection('users').document(user.sub).collection('subscription').document('usage')
+        usage_doc = usage_ref.get()
+        usage_data = usage_doc.to_dict() if usage_doc.exists else {}
         
         # Update usage
         current_count = usage_data.get(f"{request.feature_type}_used", 0)
@@ -361,7 +356,7 @@ async def track_feature_usage(request: TrialUsageUpdate, user: AuthorizedUser) -
         usage_data[f"{request.feature_type}_used"] = new_count
         
         # Store updated usage
-        db.storage.json.put(get_usage_storage_key(user.sub), usage_data)
+        usage_ref.set(usage_data, merge=True)
         
         # Check if limit exceeded
         limit = TRIAL_LIMITS.get(request.feature_type, 0)
@@ -377,7 +372,7 @@ async def track_feature_usage(request: TrialUsageUpdate, user: AuthorizedUser) -
         }
         
     except Exception as e:
-        print(f"Error tracking usage: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to track usage: {str(e)}")
 
 @router.get("/check-limit/{feature_type}")
@@ -396,7 +391,9 @@ async def check_feature_limit(feature_type: str, user: AuthorizedUser) -> Dict[s
             }
         
         # Get current usage
-        usage_data = db.storage.json.get(get_usage_storage_key(user.sub), default={})
+        db_firestore = firestore.client()
+        usage_doc = db_firestore.collection('users').document(user.sub).collection('subscription').document('usage').get()
+        usage_data = usage_doc.to_dict() if usage_doc.exists else {}
         current_usage = usage_data.get(f"{feature_type}_used", 0)
         limit = TRIAL_LIMITS.get(feature_type, 0)
         
@@ -420,17 +417,20 @@ async def check_feature_limit(feature_type: str, user: AuthorizedUser) -> Dict[s
         }
         
     except Exception as e:
-        print(f"Error checking feature limit: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to check limit: {str(e)}")
 
 @router.post("/cancel")
 async def cancel_trial(request: CancelTrialRequest, user: AuthorizedUser) -> Dict[str, Any]:
     """Cancel trial subscription to avoid charges"""
     try:
-        print(f"Cancelling trial for user: {user.sub}")
+        pass
         
         # Get trial data
-        trial_data = db.storage.json.get(get_trial_storage_key(user.sub), default={})
+        db_firestore = firestore.client()
+        trial_ref = db_firestore.collection('users').document(user.sub).collection('subscription').document('trial')
+        trial_doc = trial_ref.get()
+        trial_data = trial_doc.to_dict() if trial_doc.exists else {}
         
         if not trial_data or not trial_data.get('stripe_subscription_id'):
             raise HTTPException(status_code=404, detail="No active trial found")
@@ -445,9 +445,9 @@ async def cancel_trial(request: CancelTrialRequest, user: AuthorizedUser) -> Dic
         trial_data['cancelled_at'] = datetime.now(timezone.utc).isoformat()
         trial_data['cancellation_reason'] = request.reason
         
-        db.storage.json.put(get_trial_storage_key(user.sub), trial_data)
+        trial_ref.set(trial_data, merge=True)
         
-        print(f"Successfully cancelled trial subscription: {subscription_id}")
+        pass
         
         return {
             'success': True,
@@ -456,7 +456,7 @@ async def cancel_trial(request: CancelTrialRequest, user: AuthorizedUser) -> Dic
         }
         
     except Exception as e:
-        print(f"Error cancelling trial: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to cancel trial: {str(e)}")
 
 @router.get("/admin/users")
@@ -472,44 +472,47 @@ async def get_trial_users(user: AuthorizedUser) -> List[Dict[str, Any]]:
         if user.sub not in admin_user_ids:
             raise HTTPException(status_code=403, detail="Admin access required")
         
-        # Get all trial files
-        trial_files = db.storage.json.list()
+        # Get all trial files via Firestore users instead of scanning storage
+        db_firestore = firestore.client()
+        users_ref = db_firestore.collection('users').stream()
         trial_users = []
         
-        for file in trial_files:
-            if file.name.startswith('trial_status.'):
-                user_id = file.name.replace('trial_status.', '')
-                trial_data = db.storage.json.get(file.name, default={})
-                usage_data = db.storage.json.get(get_usage_storage_key(user_id), default={})
+        for user_doc in users_ref:
+            user_id = user_doc.id
+            trial_doc = db_firestore.collection('users').document(user_id).collection('subscription').document('trial').get()
+            
+            if trial_doc.exists:
+                trial_data = trial_doc.to_dict()
+                usage_doc = db_firestore.collection('users').document(user_id).collection('subscription').document('usage').get()
+                usage_data = usage_doc.to_dict() if usage_doc.exists else {}
                 
-                if trial_data:
-                    trial_users.append({
-                        'user_id': user_id,
-                        'trial_plan': trial_data.get('trial_plan'),
-                        'trial_start': trial_data.get('trial_start_date'),
-                        'trial_end': trial_data.get('trial_end_date'),
-                        'has_cancelled': trial_data.get('has_cancelled', False),
-                        'subscription_id': trial_data.get('stripe_subscription_id'),
-                        'usage': usage_data
-                    })
+                trial_users.append({
+                    'user_id': user_id,
+                    'trial_plan': trial_data.get('trial_plan'),
+                    'trial_start': trial_data.get('trial_start_date'),
+                    'trial_end': trial_data.get('trial_end_date'),
+                    'has_cancelled': trial_data.get('has_cancelled', False),
+                    'subscription_id': trial_data.get('stripe_subscription_id'),
+                    'usage': usage_data
+                })
         
         return trial_users
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting trial users: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to get trial users: {str(e)}")
 
 @router.get("/health")
 def trial_health_check() -> Dict[str, Any]:
     """Health check for trial management system"""
     try:
-        # Test storage access
-        test_key = "trial_health_test"
-        test_data = {"test": True, "timestamp": datetime.now().isoformat()}
-        db.storage.json.put(test_key, test_data)
-        retrieved = db.storage.json.get(test_key)
+        # Test Firestore access as health signal
+        from firebase_admin import firestore as _fs
+        health_ref = _fs.client().collection("system").document("trial_health")
+        health_ref.set({"test": True, "timestamp": datetime.now().isoformat()})
+        retrieved = health_ref.get().to_dict()
         
         # Test Stripe connection
         stripe.Account.retrieve()

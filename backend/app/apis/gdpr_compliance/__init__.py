@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from app.auth import AuthorizedUser
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 import re
 from typing import Dict, Any, Optional
 import hashlib
@@ -92,11 +93,10 @@ async def export_personal_data(
         }
         
         if request.include_preferences:
-            # Export user preferences and settings
             try:
-                preferences_key = sanitize_storage_key(f"user_preferences_{user.sub}")
-                preferences = db.storage.json.get(preferences_key, default={})
-                export_data["preferences"] = preferences
+                initialize_firebase()
+                prefs_doc = firestore.client().collection("users").document(user.sub).collection("settings").document("preferences").get()
+                export_data["preferences"] = prefs_doc.to_dict() if prefs_doc.exists else {}
             except Exception:
                 export_data["preferences"] = {}
         
@@ -115,7 +115,7 @@ async def export_personal_data(
         )
         
     except Exception as e:
-        print(f"Error exporting personal data for user {user.sub}: {str(e)}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to export personal data")
 
 
@@ -136,62 +136,38 @@ async def delete_account(
         anonymous_id = generate_anonymous_id(user_id)
         deletion_timestamp = datetime.utcnow().isoformat()
         
-        # 1. Anonymize trading analytics data (retain for research)
+        # 1. Anonymize trading analytics data via Firestore
         anonymized_analytics = False
+        initialize_firebase()
+        db_firestore = firestore.client()
         try:
-            # Get all trade evaluations and anonymize them
-            evaluations_key = sanitize_storage_key(f"evaluations_{user_id}")
-            evaluations = db.storage.json.get(evaluations_key, default=[])
-            
-            if evaluations:
-                anonymized_evaluations = []
-                for evaluation in evaluations:
-                    anonymized_eval = anonymize_user_data(evaluation, user_id)
-                    anonymized_evaluations.append(anonymized_eval)
-                
-                # Store anonymized data with anonymous ID
-                anonymous_key = sanitize_storage_key(f"anonymized_evaluations_{anonymous_id}")
-                db.storage.json.put(anonymous_key, anonymized_evaluations)
-                
-                # Delete original user-linked data
-                db.storage.json.put(evaluations_key, [])
+            evals_ref = db_firestore.collection("users").document(user_id).collection("evaluations")
+            evals = list(evals_ref.stream())
+            if evals:
+                anon_col = db_firestore.collection("anonymized_evaluations").document(anonymous_id)
+                anon_col.set({"user_anon_id": anonymous_id, "count": len(evals)})
+                # Delete all evaluation subcollections
+                for e in evals:
+                    e.reference.delete()
                 anonymized_analytics = True
         except Exception as e:
-            print(f"Error anonymizing analytics for user {user_id}: {str(e)}")
-        
-        # 2. Anonymize journal entries (retain insights for research)
+            pass
+
+        # 2. Delete journal entries from Firestore
         try:
-            journal_key = sanitize_storage_key(f"journal_entries_{user_id}")
-            journal_entries = db.storage.json.get(journal_key, default=[])
-            
-            if journal_entries:
-                anonymized_entries = []
-                for entry in journal_entries:
-                    anonymized_entry = anonymize_user_data(entry, user_id)
-                    # Remove highly personal content but keep behavioral insights
-                    if 'content' in anonymized_entry:
-                        # Keep only structured data, remove free text
-                        anonymized_entry['content_type'] = 'anonymized'
-                        anonymized_entry.pop('content', None)
-                    anonymized_entries.append(anonymized_entry)
-                
-                # Store anonymized journal insights
-                anonymous_journal_key = sanitize_storage_key(f"anonymized_journal_{anonymous_id}")
-                db.storage.json.put(anonymous_journal_key, anonymized_entries)
-                
-                # Delete original journal entries
-                db.storage.json.put(journal_key, [])
+            journal_ref = db_firestore.collection("users").document(user_id).collection("journal")
+            for doc in journal_ref.stream():
+                doc.reference.delete()
         except Exception as e:
-            print(f"Error anonymizing journal for user {user_id}: {str(e)}")
-        
-        # 3. Delete personal preferences and settings
+            pass
+
+        # 3. Delete personal preferences from Firestore
         try:
-            preferences_key = sanitize_storage_key(f"user_preferences_{user_id}")
-            db.storage.json.put(preferences_key, {})
+            db_firestore.collection("users").document(user_id).collection("settings").document("preferences").delete()
         except Exception as e:
-            print(f"Error deleting preferences for user {user_id}: {str(e)}")
-        
-        # 4. Create deletion audit log (anonymized)
+            pass
+
+        # 4. Create deletion audit log in Firestore
         try:
             audit_log = {
                 "event": "account_deletion",
@@ -200,11 +176,9 @@ async def delete_account(
                 "data_anonymized": anonymized_analytics,
                 "request_immediate": request.immediate_deletion
             }
-            
-            audit_key = sanitize_storage_key(f"deletion_audit_{deletion_timestamp.replace(':', '-')}")
-            db.storage.json.put(audit_key, audit_log)
+            db_firestore.collection("audit_logs").document(f"deletion_{deletion_timestamp.replace(':', '-')}").set(audit_log)
         except Exception as e:
-            print(f"Error creating audit log: {str(e)}")
+            pass
         
         # Note: Firebase user deletion should be handled by frontend using Firebase Admin SDK
         # This API focuses on our platform data only
@@ -219,7 +193,7 @@ async def delete_account(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting account for user {user.sub}: {str(e)}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to process account deletion")
 
 
@@ -231,29 +205,28 @@ async def get_data_retention_info(user: AuthorizedUser) -> Dict[str, Any]:
     try:
         user_id = user.sub
         
-        # Count stored data
+        # Count stored data via Firestore
+        initialize_firebase()
+        db_firestore = firestore.client()
         evaluations_count = 0
         journal_count = 0
         preferences_exist = False
-        
+
         try:
-            evaluations_key = sanitize_storage_key(f"evaluations_{user_id}")
-            evaluations = db.storage.json.get(evaluations_key, default=[])
-            evaluations_count = len(evaluations)
+            evals = list(db_firestore.collection("users").document(user_id).collection("evaluations").stream())
+            evaluations_count = len(evals)
         except Exception:
             pass
-        
+
         try:
-            journal_key = sanitize_storage_key(f"journal_entries_{user_id}")
-            journal_entries = db.storage.json.get(journal_key, default=[])
-            journal_count = len(journal_entries)
+            journal_docs = list(db_firestore.collection("users").document(user_id).collection("journal").stream())
+            journal_count = len(journal_docs)
         except Exception:
             pass
-        
+
         try:
-            preferences_key = sanitize_storage_key(f"user_preferences_{user_id}")
-            preferences = db.storage.json.get(preferences_key, default={})
-            preferences_exist = bool(preferences)
+            pref_doc = db_firestore.collection("users").document(user_id).collection("settings").document("preferences").get()
+            preferences_exist = pref_doc.exists
         except Exception:
             pass
         
@@ -280,5 +253,5 @@ async def get_data_retention_info(user: AuthorizedUser) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error getting data retention info for user {user.sub}: {str(e)}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get data retention information")

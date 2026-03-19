@@ -25,6 +25,9 @@ import { getCardClasses } from 'utils/designSystem';
 import { useUserGuardContext } from 'app';
 import { toast } from 'sonner';
 import brain from 'utils/brain';
+import { db, storage } from 'utils/firebase';
+import { collection, query, where, getDocs, setDoc, deleteDoc, doc } from 'firebase/firestore';
+import { ref, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
@@ -90,11 +93,17 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({
     
     setLoadingScreenshots(true);
     try {
-      const response = await brain.list_trade_screenshots({ tradeId: trade.id });
-      if (response.ok) {
-        const data = await response.json();
-        setScreenshots(data.screenshots || []);
-      }
+      const q = query(
+        collection(db, `screenshots/${user.uid}/files`),
+        where('tradeId', '==', trade.id)
+      );
+      const querySnapshot = await getDocs(q);
+      const loadedScreenshots = querySnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      })) as ScreenshotData[];
+      
+      setScreenshots(loadedScreenshots);
     } catch (error) {
       console.error('Error loading screenshots:', error);
       toast.error('Failed to load screenshots');
@@ -102,6 +111,54 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({
       setLoadingScreenshots(false);
     }
   }, [trade?.id, user]);
+  
+  const handleUploadScreenshot = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !trade?.id || !user) return;
+    
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error('File size must be less than 5MB');
+      return;
+    }
+    
+    setLoadingScreenshots(true);
+    try {
+      const screenshotId = Date.now().toString() + '_' + Math.random().toString(36).substring(7);
+      const storageRef = ref(storage, `trade-screenshots/${user.uid}/${screenshotId}`);
+      
+      await uploadBytes(storageRef, file);
+      const dlUrl = await getDownloadURL(storageRef);
+      
+      const metadata = {
+        tradeId: trade.id,
+        filename: file.name,
+        url: dlUrl,
+        timestamp: new Date().toISOString()
+      };
+      
+      await setDoc(doc(db, `screenshots/${user.uid}/files/${screenshotId}`), metadata);
+      toast.success('Screenshot uploaded successfully');
+      await loadScreenshots();
+    } catch (error) {
+      console.error('Error uploading screenshot:', error);
+      toast.error('Failed to upload screenshot');
+      setLoadingScreenshots(false);
+    }
+  };
+
+  const handleDeleteScreenshot = async (screenshotId: string) => {
+    if (!user) return;
+    try {
+      const storageRef = ref(storage, `trade-screenshots/${user.uid}/${screenshotId}`);
+      await deleteObject(storageRef);
+      await deleteDoc(doc(db, `screenshots/${user.uid}/files/${screenshotId}`));
+      toast.success('Screenshot deleted');
+      setScreenshots(prev => prev.filter(s => s.id !== screenshotId));
+    } catch (error) {
+      console.error('Error deleting screenshot:', error);
+      toast.error('Failed to delete screenshot');
+    }
+  };
 
   // Handle notes editing
   const handleEditNotes = useCallback(() => {
@@ -674,10 +731,18 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({
               <TabsContent value="screenshots" className="mt-0">
                 <Card className={getCardClasses('default', 'lg')}>
                   <CardHeader>
-                    <CardTitle className="text-white flex items-center gap-2">
-                      <Camera className="w-5 h-5 text-cyan-400" />
-                      Chart Screenshots
-                    </CardTitle>
+                    <div className="flex justify-between items-center w-full">
+                      <CardTitle className="text-white flex items-center gap-2">
+                        <Camera className="w-5 h-5 text-cyan-400" />
+                        Chart Screenshots
+                      </CardTitle>
+                      <Button variant="outline" size="sm" className="bg-cyan-900/40 border-cyan-800 text-cyan-400 hover:bg-cyan-800/60" asChild>
+                        <label className="cursor-pointer">
+                          Upload Screenshot
+                          <input type="file" className="hidden" accept="image/*" onChange={handleUploadScreenshot} />
+                        </label>
+                      </Button>
+                    </div>
                   </CardHeader>
                   <CardContent>
                     {loadingScreenshots ? (
@@ -688,13 +753,20 @@ export const TradeDetailsModal: React.FC<TradeDetailsModalProps> = ({
                     ) : screenshots.length > 0 ? (
                       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
                         {screenshots.map((screenshot) => (
-                          <div key={screenshot.id} className="bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                          <div key={screenshot.id} className="relative group bg-gray-800/50 rounded-lg p-4 border border-gray-700">
+                            <button 
+                              onClick={() => handleDeleteScreenshot(screenshot.id)}
+                              className="absolute top-2 right-2 p-1.5 bg-red-500/80 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 hover:bg-red-500"
+                              title="Delete screenshot"
+                            >
+                              <Trash2 className="w-4 h-4 text-white" />
+                            </button>
                             <img
                               src={screenshot.url}
                               alt={screenshot.filename}
                               className="w-full h-32 object-cover rounded mb-2"
                             />
-                            <div className="text-sm text-gray-400">{screenshot.filename}</div>
+                            <div className="text-sm text-gray-400 truncate">{screenshot.filename}</div>
                             <div className="text-xs text-gray-500">
                               {new Date(screenshot.timestamp).toLocaleString()}
                             </div>

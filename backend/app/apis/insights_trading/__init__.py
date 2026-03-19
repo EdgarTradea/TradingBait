@@ -179,7 +179,7 @@ def get_trading_data(user_id: str, days_back: int = 30) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error getting trading data: {e}")
+        pass
         return {
             "trades": [],
             "summary": {
@@ -213,7 +213,7 @@ def get_journal_data(user_id: str, days_back: int = 30) -> List[Dict[str, Any]]:
         return recent_entries
         
     except Exception as e:
-        print(f"Error getting journal data: {e}")
+        pass
         return []
 
 def create_analysis_prompt(trading_data: Dict[str, Any], analysis_type: str, focus_areas: List[str] = None) -> str:
@@ -321,7 +321,7 @@ async def analyze_trading_performance(request: TradingAnalysisRequest, user: Aut
     user_id = user.sub
     
     try:
-        print(f"📊 Analyzing trading performance for user {user_id} - Type: {request.analysis_type}")
+        pass
         
         # Get trading data
         trading_data = get_trading_data(user_id, request.time_period)
@@ -427,7 +427,7 @@ async def analyze_trading_performance(request: TradingAnalysisRequest, user: Aut
             )
         ]
         
-        print(f"✅ Trading analysis completed for user {user_id}")
+        pass
         
         return TradingAnalysisResponse(
             analysis_summary=f"Analysis of {total_trades} trades over {request.time_period} days shows {trading_data['summary']['win_rate']:.1%} win rate with ${trading_data['summary']['total_pnl']:,.2f} total P&L",
@@ -456,7 +456,7 @@ async def analyze_trading_performance(request: TradingAnalysisRequest, user: Aut
         )
         
     except Exception as e:
-        print(f"❌ Error in trading analysis: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error analyzing trading performance: {str(e)}")
 
 @router.post("/patterns")
@@ -465,7 +465,7 @@ async def analyze_trading_patterns(request: PatternAnalysisRequest, user: Author
     user_id = user.sub
     
     try:
-        print(f"🔍 Analyzing trading patterns for user {user_id}")
+        pass
         
         # Get trading data
         trading_data = get_trading_data(user_id, request.time_range or 90)
@@ -544,7 +544,7 @@ Provide specific pattern insights with statistical backing.
         )
         
     except Exception as e:
-        print(f"❌ Error in pattern analysis: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error analyzing patterns: {str(e)}")
 
-print("📊 Consolidated Trading Insights API loaded successfully")
+pass

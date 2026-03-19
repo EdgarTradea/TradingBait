@@ -55,9 +55,9 @@ async def analyze_file_structure(file: UploadFile, user: AuthorizedUser) -> File
     """Analyze the structure of an uploaded trading file using OpenAI"""
     
     try:
-        print("=== FILE ANALYSIS START ===")
-        print(f"User: {user.sub}")
-        print(f"File: {file.filename}")
+        pass
+        pass
+        pass
         
         # Read file content
         file_content = await file.read()
@@ -73,7 +73,7 @@ async def analyze_file_structure(file: UploadFile, user: AuthorizedUser) -> File
         )
         
     except Exception as e:
-        print(f"Error in analyze_file_structure: {e}")
+        pass
         raise HTTPException(
             status_code=500, 
             detail=f"Analysis failed: {str(e)}"
@@ -108,12 +108,12 @@ async def process_file(
                 
                 # Apply FIFO aggregation only for futures platforms that use individual fills
                 if any(keyword in file_type for keyword in ['futures', 'cme', 'ninja', 'amp', 'continuum']):
-                    print(f"Converting {len(processed_trades)} futures fills to round-trip trades using FIFO...")
+                    pass
                     processed_trades = simple_fifo_aggregation(processed_trades)
-                    print(f"Created {len(processed_trades)} round-trip trades from FIFO matching")
+                    pass
                 else:
                     # For CFDs, Forex, Stocks - keep individual fills as complete trades
-                    print(f"Processing {len(processed_trades)} individual trades (CFDs/Forex/Stocks - no FIFO aggregation)")
+                    pass
             
             # Save FIFO-calculated roundtrip trades to Firestore
             trades_saved = 0
@@ -137,7 +137,7 @@ async def process_file(
                     duplicate_exists = await _check_for_identical_trade(db_firestore, user_id, evaluation_id, trade_data)
                     
                     if duplicate_exists:
-                        print(f"Skipping duplicate trade: {trade_data.get('symbol', 'Unknown')} at {trade_data.get('openTime', 'Unknown')}")
+                        pass
                         skipped_duplicates += 1
                         continue
                     
@@ -150,7 +150,7 @@ async def process_file(
                     trades_saved += 1
                     
                 except Exception as e:
-                    print(f"Failed to save trade: {e}")
+                    pass
                     failed_trades += 1
             
             # Get evaluation info for response
@@ -169,7 +169,7 @@ async def process_file(
                 }
             )
         except Exception as e:
-            print(f"Error processing file: {e}")
+            pass
             raise HTTPException(
                 status_code=500,
                 detail=f"Internal server error: {str(e)}"
@@ -185,7 +185,7 @@ async def process_file(
             detail=f"File processing error: {str(e)}"
         ) from e
     except Exception as e:
-        print(f"Unexpected error in process_file: {e}")
+        pass
         raise HTTPException(
             status_code=500,
             detail=f"Internal server error: {str(e)}"
@@ -210,7 +210,7 @@ async def _analyze_with_openai(file_content: bytes, filename: str) -> Dict:
                 # First try MT5-specific extraction for structured reports
                 mt5_data = extract_mt5_positions_from_xlsx(file_content)
                 if mt5_data is not None:
-                    print("Using MT5-specific preprocessing for AI analysis")
+                    pass
                     # Convert DataFrame to readable text format for AI
                     sample_lines = []
                     
@@ -228,7 +228,7 @@ async def _analyze_with_openai(file_content: bytes, filename: str) -> Dict:
                     
                 else:
                     # Fallback: Standard Excel parsing
-                    print("Using standard Excel preprocessing for AI analysis")
+                    pass
                     df = pd.read_excel(io.BytesIO(file_content), nrows=20)  # Read first 20 rows
                     
                     sample_lines = []
@@ -245,7 +245,7 @@ async def _analyze_with_openai(file_content: bytes, filename: str) -> Dict:
                     total_lines = len(df)
                     
             except Exception as excel_error:
-                print(f"Excel preprocessing failed: {excel_error}")
+                pass
                 return _get_fallback_analysis(file_content, filename)
                 
         else:
@@ -285,13 +285,13 @@ async def _analyze_with_openai(file_content: bytes, filename: str) -> Dict:
             
             sample_content = '\n'.join(sample_lines)[:3000]  # Increased to 3000 chars
         
-        print(f"Enhanced file analysis - Total lines: {total_lines}, Sample lines extracted for AI")
-        print(f"Sample content preview (first 500 chars): {sample_content[:500]}...")
+        pass
+        pass
         
         # Count total lines to inform user about file size
         # total_lines = len(file_text.split('\n'))  # Removed duplicate line
         
-        print(f"File analysis - Total lines: {total_lines}, Analyzing first 20 lines only")
+        pass
         
         # Enhanced prompt with futures detection and FIFO-priority mapping
         prompt = f"""
@@ -522,7 +522,7 @@ CRITICAL RULES:
         
         # Validate response size to ensure it's just structure mapping
         if len(response_text) > 2000:
-            print("Warning: OpenAI response unexpectedly long, using fallback")
+            pass
             return _get_fallback_analysis(file_content, filename)
         
         # Parse the JSON response with validation
@@ -532,7 +532,7 @@ CRITICAL RULES:
             # Validate the response structure
             required_fields = ['data_start_row', 'column_mapping', 'confidence', 'file_type']
             if not all(field in analysis_result for field in required_fields):
-                print("Warning: Missing required fields in AI response, using fallback")
+                pass
                 return _get_fallback_analysis(file_content, filename)
                 
             # CRITICAL FIX: Check if AI mapped everything as 'unknown'
@@ -541,19 +541,19 @@ CRITICAL RULES:
             total_columns = len(column_mapping)
             
             if total_columns > 0 and unknown_count == total_columns:
-                print(f"Warning: AI mapped all {total_columns} columns as 'unknown', using header-based fallback")
+                pass
                 return _get_header_based_fallback(file_content, filename)
             elif unknown_count > total_columns * 0.8:  # More than 80% unknown
-                print(f"Warning: AI mapped {unknown_count}/{total_columns} columns as 'unknown', enhancing with header analysis")
+                pass
                 return _enhance_with_header_analysis(analysis_result, file_content, filename)
                 
             # Validate data_start_row is reasonable
             if analysis_result.get('data_start_row', 0) > 50:
-                print("Warning: AI suggested unreasonable data start row, using fallback")
+                pass
                 return _get_fallback_analysis(file_content, filename)
                 
-            print(f"AI Analysis successful: {analysis_result.get('file_type')} file with {analysis_result.get('confidence')} confidence")
-            print(f"Column mapping: {len([f for f in column_mapping.values() if f != 'unknown'])} mapped, {unknown_count} unknown")
+            pass
+            pass
             return analysis_result
             
         except json.JSONDecodeError:
@@ -567,11 +567,11 @@ CRITICAL RULES:
                 except json.JSONDecodeError:
                     pass
             
-            print("Warning: Could not parse AI response as JSON, using fallback")
+            pass
             return _get_fallback_analysis(file_content, filename)
                 
     except Exception as e:
-        print(f"Error in OpenAI analysis: {e}")
+        pass
         return _get_fallback_analysis(file_content, filename)
 
 
@@ -610,7 +610,7 @@ def extract_mt5_positions_from_xlsx(file_content: bytes) -> Optional[pd.DataFram
                 break
         
         if positions_row is None:
-            print("No 'Positions' section found in XLSX file")
+            pass
             return None
             
         # Look for the header row after Positions (should contain Time, Symbol, etc.)
@@ -623,7 +623,7 @@ def extract_mt5_positions_from_xlsx(file_content: bytes) -> Optional[pd.DataFram
                 break
                 
         if header_row is None:
-            print("No header row found after Positions section")
+            pass
             return None
             
         # Find the end of positions data (look for next section or summary)
@@ -648,11 +648,11 @@ def extract_mt5_positions_from_xlsx(file_content: bytes) -> Optional[pd.DataFram
         positions_df.reset_index(drop=True, inplace=True)
         positions_df.columns = [f'column_{i}' for i in range(len(positions_df.columns))]
         
-        print(f"Extracted {len(positions_df)-1} position records from MT5 XLSX (plus header)")
+        pass
         return positions_df
         
     except Exception as e:
-        print(f"Error extracting MT5 positions: {e}")
+        pass
         return None
 
 
@@ -670,8 +670,8 @@ async def _process_csv_with_ai_mapping(file: UploadFile, analysis: Dict, broker_
         data_start_row = analysis.get('data_start_row', 0)
         column_mappings = analysis.get('column_mapping', {})
         
-        print(f"Processing {file_ext} file with data starting at row {data_start_row}")
-        print(f"Column mappings: {column_mappings}")
+        pass
+        pass
         
         # Handle file reading based on type
         if file_ext == 'csv':
@@ -683,7 +683,7 @@ async def _process_csv_with_ai_mapping(file: UploadFile, analysis: Dict, broker_
             # When data_start_row is > 0, skip that many header rows
             if data_start_row == 0:
                 # No headers - use all data rows, create generic column names
-                print("No headers detected - processing all rows as trade data")
+                pass
                 # Don't skip any lines - use all data
                 clean_lines = [line for line in lines if line.strip()]  # Remove only empty lines
                 clean_csv_content = '\n'.join(clean_lines)
@@ -695,7 +695,7 @@ async def _process_csv_with_ai_mapping(file: UploadFile, analysis: Dict, broker_
                 
             else:
                 # Headers exist - skip header lines and use remaining data
-                print(f"Headers detected - skipping first {data_start_row} rows")
+                pass
                 clean_lines = lines[data_start_row:]
                 clean_csv_content = '\n'.join(clean_lines)
                 
@@ -709,24 +709,24 @@ async def _process_csv_with_ai_mapping(file: UploadFile, analysis: Dict, broker_
             mt5_data = extract_mt5_positions_from_xlsx(file_content)
             if mt5_data is not None:
                 df = mt5_data
-                print("Using MT5-specific XLSX preprocessing")
+                pass
             else:
                 # Fallback to standard Excel parsing
                 if data_start_row == 0:
                     # No headers - use generic names
                     df = pd.read_excel(io.BytesIO(file_content), header=None)
                     df.columns = [f'column_{i}' for i in range(len(df.columns))]
-                    print("Excel: No headers detected - using generic column names")
+                    pass
                 else:
                     # Headers exist - preserve them for AI semantic analysis
                     df = pd.read_excel(io.BytesIO(file_content), skiprows=data_start_row-1, header=0)
-                    print(f"Excel: Headers preserved from row {data_start_row}: {list(df.columns)}")
-                print("Using standard XLSX parsing")
+                    pass
+                pass
         else:
             raise ValueError(f"Unsupported file format: {file_ext}")
         
-        print(f"Successfully parsed {len(df)} rows of data")
-        print(f"Columns found: {list(df.columns)}")
+        pass
+        pass
         
         # Process each row with deterministic code
         trades = []
@@ -753,19 +753,19 @@ async def _process_csv_with_ai_mapping(file: UploadFile, analysis: Dict, broker_
                         "row_data": dict(row.head(5))  # First 5 columns for debugging
                     }
                     skipped_rows.append(skipped_info)
-                    print(f"SKIPPED ROW {idx}: symbol='{symbol_value}', first_5_cols={dict(row.head(5))}")
+                    pass
             except Exception as e:
-                print(f"Warning: Failed to process row {idx}: {e}")
+                pass
                 skipped_rows.append({"row_index": idx, "error": str(e)})
                 continue  # Skip invalid rows but continue processing
         
-        print(f"Successfully converted {len(trades)} trades")
+        pass
         if skipped_rows:
-            print(f"IMPORTANT: Skipped {len(skipped_rows)} rows - details logged above")
+            pass
         return trades
         
     except Exception as e:
-        print(f"Error processing file data: {e}")
+        pass
         raise ValueError(f"Failed to process file data: {str(e)}") from e
 
 
@@ -780,7 +780,7 @@ def _convert_row_to_trade(row: pd.Series, columns: List[str], column_mapping: Di
         trade_timezone = pytz.timezone(broker_timezone)
     except pytz.UnknownTimeZoneError:
         # Fallback to UTC if timezone is invalid
-        print(f"Warning: Invalid timezone '{broker_timezone}' provided. Falling back to UTC.")
+        pass
         trade_timezone = pytz.utc
 
     # Extract file type and required fields from analysis
@@ -815,7 +815,7 @@ def _convert_row_to_trade(row: pd.Series, columns: List[str], column_mapping: Di
                 # Example custom format: '2023.05.10 08:30:00'
                 naive_dt = datetime.strptime(str(time_str), '%Y.%m.%d %H:%M:%S')
             except (ValueError, TypeError):
-                print(f"Warning: Could not parse time '{time_str}' on row {row_index}")
+                pass
                 return None
         
         # Localize to broker timezone, then convert to UTC and format as ISO string
@@ -845,7 +845,7 @@ def _convert_row_to_trade(row: pd.Series, columns: List[str], column_mapping: Di
             if 'time' in field_name.lower():
                 time_val = process_time(value)
                 if not time_val:
-                    print(f"Warning: Skipping row {row_index} due to unparsable time in column {col_idx} for field {field_name}")
+                    pass
                     return None # Skip row if time is invalid
                 
                 if field_name == 'entry_time' or field_name == 'timestamp':
@@ -857,7 +857,7 @@ def _convert_row_to_trade(row: pd.Series, columns: List[str], column_mapping: Di
             elif field_name in ['quantity', 'entry_price', 'exit_price', 'price', 'pnl', 'commission', 'swap']:
                 numeric_value = pd.to_numeric(value, errors='coerce')
                 if pd.isna(numeric_value):
-                    print(f"Warning: Skipping row {row_index} due to invalid numeric value in column {col_idx} for field {field_name}")
+                    pass
                     return None # Skip row if critical numeric value is invalid
                 
                 if field_name == 'quantity':
@@ -883,7 +883,7 @@ def _convert_row_to_trade(row: pd.Series, columns: List[str], column_mapping: Di
             raw_data[field_name] = value
 
         except Exception as e:
-            print(f"Error processing field {field_name} on row {row_index}: {e}")
+            pass
             return None # Skip row on error
 
     trade_data.raw_row_data = raw_data
@@ -891,7 +891,7 @@ def _convert_row_to_trade(row: pd.Series, columns: List[str], column_mapping: Di
     # Final validation for CFD/Forex trades
     if file_type != 'futures':
         if not all([trade_data.openTime, trade_data.closeTime, trade_data.openPrice, trade_data.closePrice, trade_data.symbol, trade_data.type]):
-            print(f"Skipping row {row_index} due to missing required CFD/Forex data.")
+            pass
             return None
 
     return trade_data
@@ -1088,7 +1088,7 @@ def simple_fifo_aggregation(fills: List[ProcessedTradeData]) -> List[ProcessedTr
                 )
                 round_trips.append(roundtrip)
     
-    print(f"Created {len(round_trips)} aggregated round-trip trades from FIFO matching")
+    pass
     return round_trips
 
 def _get_header_based_fallback(file_content: bytes, filename: str) -> Dict:
@@ -1191,8 +1191,8 @@ def _get_header_based_fallback(file_content: bytes, filename: str) -> Dict:
             mapped_fields = [f for f in column_mapping.values() if f != 'unknown']
             confidence = "high" if len(mapped_fields) >= 4 else "medium" if len(mapped_fields) >= 2 else "low"
             
-            print(f"Header-based fallback: Mapped {len(mapped_fields)}/{len(headers)} columns for {file_type} file")
-            print(f"Detected headers: {headers[:5]}...")  # Show first 5 headers
+            pass
+            pass
             
             return {
                 "file_type": file_type,
@@ -1225,7 +1225,7 @@ def _get_header_based_fallback(file_content: bytes, filename: str) -> Dict:
         }
         
     except Exception as e:
-        print(f"Error in header-based fallback: {e}")
+        pass
         return {
             "data_start_row": 0,
             "column_mapping": {"column_0": "unknown", "column_1": "unknown", "column_2": "unknown"},
@@ -1308,8 +1308,8 @@ def _map_excel_headers_to_fields(headers: List[str]) -> Dict:
     mapped_fields = [f for f in column_mapping.values() if f != 'unknown']
     confidence = "high" if len(mapped_fields) >= 4 else "medium" if len(mapped_fields) >= 2 else "low"
     
-    print(f"Excel header mapping: Mapped {len(mapped_fields)}/{len(headers)} columns for {file_type} file")
-    print(f"Detected headers: {headers[:5]}...")  # Show first 5 headers
+    pass
+    pass
     
     return {
         "file_type": file_type,
@@ -1359,12 +1359,12 @@ def _enhance_with_header_analysis(analysis_result: Dict, file_content: bytes, fi
             else:
                 analysis_result['confidence'] = 'low'
                 
-            print(f"Enhanced AI analysis: {len(mapped_fields)} mapped, {unknown_count} unknown (was {sum(1 for f in original_mapping.values() if f == 'unknown')} unknown)")
+            pass
             
         return analysis_result
         
     except Exception as e:
-        print(f"Error enhancing analysis: {e}")
+        pass
         return analysis_result
 
 async def _check_for_identical_trade(db_firestore: firestore.Client, user_id: str, evaluation_id: str, trade_data: Dict) -> bool:
@@ -1417,13 +1417,13 @@ async def _check_for_identical_trade(db_firestore: firestore.Client, user_id: st
                         break
             
             if is_identical:
-                print(f"Found identical trade: {symbol} at {open_time} - skipping")
+                pass
                 return True
         
         return False  # No identical trade found
     
     except Exception as e:
-        print(f"Error checking for identical trade: {e}")
+        pass
         return False  # Proceed with saving in case of error
 
 def _parse_field_value(value: Any, field_name: str) -> Any:
@@ -1448,7 +1448,7 @@ def _parse_field_value(value: Any, field_name: str) -> Any:
             return _auto_convert(value)
 
     except Exception as e:
-        print(f"Conversion error for {field_name}={value}: {e}")
+        pass
         return None
 
 
@@ -1500,7 +1500,7 @@ def _parse_datetime_with_timezone(value: Any, timezone_str: str) -> Optional[str
     try:
         tz = pytz.timezone(timezone_str)
     except pytz.UnknownTimeZoneError:
-        print(f"Warning: Unknown timezone '{timezone_str}'. Falling back to UTC.")
+        pass
         tz = pytz.utc
 
     naive_dt = None
@@ -1527,7 +1527,7 @@ def _parse_datetime_with_timezone(value: Any, timezone_str: str) -> Optional[str
         try: # Fallback for pandas auto-parsing
             naive_dt = pd.to_datetime(value).to_pydatetime()
         except (ValueError, TypeError):
-             print(f"Warning: Could not parse datetime '{value}'")
+             pass
              return None
 
     # Localize the naive datetime and convert to UTC
@@ -1547,10 +1547,10 @@ def _parse_number(value: Any) -> float:
         try:
             return float(value)
         except ValueError:
-            print(f"Warning: Could not parse number '{value}'")
+            pass
             return None
     else:
-        print(f"Warning: Unexpected type for number field: {type(value)}")
+        pass
         return None
 
 

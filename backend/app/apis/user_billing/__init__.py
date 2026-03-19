@@ -87,17 +87,17 @@ async def track_affiliate_conversion_for_payment(user_id: str, subscription_id: 
         )
         
         if result.get("success"):
-            print(f"Affiliate conversion tracked: ${amount_dollars} -> ${result.get('commission_amount', 0)} commission")
+            pass
         
     except Exception as e:
-        print(f"Failed to track affiliate conversion: {e}")
+        pass
         # Don't fail the payment if affiliate tracking fails
 
 @router.get("/info")
 async def get_user_billing_info(user: AuthorizedUser) -> UserBillingInfo:
     """Get comprehensive billing information for the current user"""
     try:
-        print(f"Getting billing info for user: {user.sub}")
+        pass
 
         # Get user's Stripe customer from Firestore or email
         db_firestore = firestore.client()
@@ -120,7 +120,7 @@ async def get_user_billing_info(user: AuthorizedUser) -> UserBillingInfo:
         billing_info = UserBillingInfo(customer_id=customer_id)
 
         if not customer_id:
-            print(f"No Stripe customer found for user {user.sub}")
+            pass
             return billing_info
 
         # Get customer details
@@ -179,18 +179,18 @@ async def get_user_billing_info(user: AuthorizedUser) -> UserBillingInfo:
 
         billing_info.total_spent = total_spent
 
-        print(f"Successfully retrieved billing info for user {user.sub}")
+        pass
         return billing_info
 
     except Exception as e:
-        print(f"Error getting billing info: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to retrieve billing information: {str(e)}")
 
 @router.get("/customer-portal")
 async def get_customer_portal_url(user: AuthorizedUser) -> CustomerPortalResponse:
     """Create and return Stripe Customer Portal URL for subscription management"""
     try:
-        print(f"Creating customer portal URL for user: {user.sub}")
+        pass
 
         # Get user's Stripe customer ID
         db_firestore = firestore.client()
@@ -217,18 +217,18 @@ async def get_customer_portal_url(user: AuthorizedUser) -> CustomerPortalRespons
             return_url=return_url,
         )
 
-        print(f"Created customer portal URL: {portal_session.url}")
+        pass
         return CustomerPortalResponse(url=portal_session.url)
 
     except Exception as e:
-        print(f"Error creating customer portal: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to create customer portal: {str(e)}")
 
 @router.get("/usage")
 async def get_usage_info(user: AuthorizedUser) -> UsageInfo:
     """Get current usage statistics and limits for the user"""
     try:
-        print(f"Getting usage info for user: {user.sub}")
+        pass
 
         db_firestore = firestore.client()
 
@@ -251,7 +251,7 @@ async def get_usage_info(user: AuthorizedUser) -> UsageInfo:
 
         # Get subscription info to determine plan
         billing_info = await get_user_billing_info(user)
-        print(f"Retrieved billing info - has subscription: {billing_info.subscription is not None}")
+        pass
         
         # Default plan is $24.99/month TradingBait subscription
         plan_name = "TradingBait Pro ($24.99/month)"
@@ -270,7 +270,7 @@ async def get_usage_info(user: AuthorizedUser) -> UsageInfo:
         
         # Check subscription status
         if billing_info.subscription:
-            print(f"Subscription details - Product: {billing_info.subscription.product_name}, Price: {billing_info.subscription.price_amount}, Status: {billing_info.subscription.status}")
+            pass
             
             # Verify it's the correct $24.99 subscription (or legacy $49.99)
             if billing_info.subscription.price_amount == 2499 and billing_info.subscription.status == 'active':
@@ -280,7 +280,7 @@ async def get_usage_info(user: AuthorizedUser) -> UsageInfo:
             else:
                 plan_name = f"Unknown Plan (${billing_info.subscription.price_amount/100:.2f}/{billing_info.subscription.interval})"
         else:
-            print(f"Warning: User {user.sub} has no active subscription")
+            pass
             plan_name = "No Active Subscription"
             features = ["Limited Access - Subscription Required"]
 
@@ -298,14 +298,14 @@ async def get_usage_info(user: AuthorizedUser) -> UsageInfo:
         )
 
     except Exception as e:
-        print(f"Error getting usage info: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to retrieve usage information: {str(e)}")
 
 @router.post("/cancel-subscription")
 async def cancel_subscription(user: AuthorizedUser) -> Dict[str, Any]:
     """Cancel user's subscription at period end"""
     try:
-        print(f"Cancelling subscription for user: {user.sub}")
+        pass
 
         # Get user's subscription
         billing_info = await get_user_billing_info(user)
@@ -318,7 +318,7 @@ async def cancel_subscription(user: AuthorizedUser) -> Dict[str, Any]:
             cancel_at_period_end=True
         )
 
-        print(f"Successfully scheduled cancellation for subscription {billing_info.subscription.id}")
+        pass
         return {
             "success": True,
             "message": "Subscription will be cancelled at the end of the current billing period",
@@ -326,14 +326,14 @@ async def cancel_subscription(user: AuthorizedUser) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"Error cancelling subscription: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to cancel subscription: {str(e)}")
 
 @router.post("/reactivate-subscription")
 async def reactivate_subscription(user: AuthorizedUser) -> Dict[str, Any]:
     """Reactivate a subscription that was scheduled for cancellation"""
     try:
-        print(f"Reactivating subscription for user: {user.sub}")
+        pass
 
         # Get user's subscription
         billing_info = await get_user_billing_info(user)
@@ -346,7 +346,7 @@ async def reactivate_subscription(user: AuthorizedUser) -> Dict[str, Any]:
             cancel_at_period_end=False
         )
 
-        print(f"Successfully reactivated subscription {billing_info.subscription.id}")
+        pass
         return {
             "success": True,
             "message": "Subscription has been reactivated",
@@ -354,5 +354,5 @@ async def reactivate_subscription(user: AuthorizedUser) -> Dict[str, Any]:
         }
 
     except Exception as e:
-        print(f"Error reactivating subscription: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to reactivate subscription: {str(e)}")

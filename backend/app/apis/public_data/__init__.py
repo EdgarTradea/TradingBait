@@ -26,7 +26,7 @@ async def get_user_trades(user_id: str) -> PublicTradesResponse:
         return PublicTradesResponse(trades=trades_data)
         
     except Exception as e:
-        print(f"Error getting user trades: {e}")
+        pass
         return PublicTradesResponse(trades=[])
 
 @router.get("/evaluations/{user_id}")
@@ -40,7 +40,7 @@ async def get_user_evaluations(user_id: str) -> PublicEvaluationsResponse:
         return PublicEvaluationsResponse(evaluations=evaluations_data)
         
     except Exception as e:
-        print(f"Error getting user evaluations: {e}")
+        pass
         return PublicEvaluationsResponse(evaluations=[])
 
 @router.get("/journal/{user_id}")
@@ -54,5 +54,5 @@ async def get_user_journal_entries(user_id: str) -> PublicJournalResponse:
         return PublicJournalResponse(entries=journal_data)
         
     except Exception as e:
-        print(f"Error getting user journal entries: {e}")
+        pass
         return PublicJournalResponse(entries=[])

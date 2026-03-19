@@ -23,7 +23,7 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 try:
     firestore_db = firestore.client()
 except Exception as e:
-    print(f"Warning: Could not initialize Firestore client: {e}")
+    pass
     firestore_db = None
 
 # ============================================================================
@@ -140,7 +140,7 @@ def load_user_trades(user_id: str, days_back: int = 30) -> List[TradeData]:
         trades = []
         cutoff_date = datetime.now() - timedelta(days=days_back)
         
-        print(f"Loading trades for user {user_id} from last {days_back} days")
+        pass
         
         # Get all evaluations for user - SAME AS FRONTEND
         evaluations_ref = firestore_db.collection(f"users/{user_id}/evaluations")
@@ -193,16 +193,16 @@ def load_user_trades(user_id: str, days_back: int = 30) -> List[TradeData]:
                         recent_trades_found += 1
                         
                 except Exception as e:
-                    print(f"Error parsing trade: {e}")
+                    pass
                     continue
             
-            print(f"Found {eval_trades_count} trades in evaluation {eval_doc.id}")
+            pass
         
-        print(f"Total trades found: {total_trades_found}, Recent trades (last {days_back} days): {recent_trades_found}")
+        pass
         return trades
         
     except Exception as e:
-        print(f"Error loading user trades from Firestore: {e}")
+        pass
         return []
 
 def load_user_journal_entries(user_id: str, days_back: int = 30) -> List[JournalEntry]:
@@ -223,13 +223,13 @@ def load_user_journal_entries(user_id: str, days_back: int = 30) -> List[Journal
                     entries.append(entry)
                     
             except Exception as e:
-                print(f"Error parsing journal entry: {e}")
+                pass
                 continue
         
         return entries
         
     except Exception as e:
-        print(f"Error loading journal entries: {e}")
+        pass
         return []
 
 # ============================================================================
@@ -518,7 +518,7 @@ def analyze_trading_patterns(trades: List[TradeData]) -> List[TradingPattern]:
             if pattern:
                 patterns.append(pattern)
         except Exception as e:
-            print(f"Error in pattern detector {detector.__name__}: {e}")
+            pass
             continue
     
     return patterns
@@ -696,7 +696,7 @@ def analyze_mood_performance_correlation(trades: List[TradeData], journal_entrie
         )
         
     except Exception as e:
-        print(f"Error in mood-performance correlation analysis: {e}")
+        pass
         return None
 
 def analyze_time_performance_correlation(trades: List[TradeData]) -> Optional[PerformanceCorrelation]:
@@ -760,7 +760,7 @@ def analyze_time_performance_correlation(trades: List[TradeData]) -> Optional[Pe
         )
         
     except Exception as e:
-        print(f"Error in time-performance correlation analysis: {e}")
+        pass
         return None
 
 # ============================================================================
@@ -926,11 +926,11 @@ async def create_coaching_session(user_id: str, session_type: str, triggered_by:
         existing_sessions.append(session.model_dump())
         db.storage.json.put(sessions_key, existing_sessions)
         
-        print(f"✅ Created coaching session {session_id} for user {user_id}")
+        pass
         return session
         
     except Exception as e:
-        print(f"Error storing coaching session: {e}")
+        pass
         raise
 
 async def update_coaching_session(user_id: str, session_id: str, updates: Dict[str, Any]) -> bool:
@@ -948,7 +948,7 @@ async def update_coaching_session(user_id: str, session_id: str, updates: Dict[s
         return False
         
     except Exception as e:
-        print(f"Error updating coaching session: {e}")
+        pass
         return False
 
 async def get_coaching_analytics(user_id: str) -> CoachingAnalytics:
@@ -1008,7 +1008,7 @@ async def get_coaching_analytics(user_id: str) -> CoachingAnalytics:
         )
         
     except Exception as e:
-        print(f"Error generating coaching analytics: {e}")
+        pass
         return CoachingAnalytics(
             total_sessions=0,
             average_effectiveness=0.0,
@@ -1117,7 +1117,7 @@ async def analyze_trading_patterns_endpoint(
         )
         
     except Exception as e:
-        print(f"Error in pattern analysis: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to analyze trading patterns")
 
 async def generate_analysis_summary(patterns: List[TradingPattern], performance_data: Dict[str, Any]) -> str:
@@ -1154,7 +1154,7 @@ Provide a 2-3 sentence professional coaching summary focusing on the most critic
         return response.choices[0].message.content.strip()
         
     except Exception as e:
-        print(f"Error generating AI summary: {e}")
+        pass
         return f"Pattern analysis complete. Detected {len(patterns)} behavioral patterns requiring attention across {performance_data['total_trades']} trades."
 
 @router.post("/triggers/coaching")
@@ -1204,7 +1204,7 @@ async def trigger_coaching_session(
         }
         
     except Exception as e:
-        print(f"Error triggering coaching session: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to trigger coaching session") from e
 
 def generate_coaching_conversation_starter(trigger_data: Dict[str, Any]) -> str:
@@ -1330,7 +1330,7 @@ async def comprehensive_pattern_analysis(
         return response
         
     except Exception as e:
-        print(f"Error in comprehensive pattern analysis: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to perform comprehensive analysis")
 
 @router.get("/educational-content")
@@ -1350,7 +1350,7 @@ async def get_educational_content(user: AuthorizedUser) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error getting educational content: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to retrieve educational content")
 
 @router.post("/sessions/create")
@@ -1377,7 +1377,7 @@ async def create_coaching_session_endpoint(
         }
         
     except Exception as e:
-        print(f"Error creating coaching session: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to create coaching session")
 
 @router.put("/sessions/{session_id}")
@@ -1398,7 +1398,7 @@ async def update_coaching_session_endpoint(
         }
         
     except Exception as e:
-        print(f"Error updating coaching session: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to update coaching session")
 
 @router.get("/analytics", response_model=CoachingAnalytics)
@@ -1409,7 +1409,7 @@ async def get_coaching_analytics_endpoint(user: AuthorizedUser) -> CoachingAnaly
         return await get_coaching_analytics(user_id)
         
     except Exception as e:
-        print(f"Error getting coaching analytics: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to retrieve coaching analytics")
 
 @router.get("/correlations")
@@ -1446,7 +1446,7 @@ async def get_performance_correlations(user: AuthorizedUser, days_back: int = 30
         }
         
     except Exception as e:
-        print(f"Error getting correlations: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to retrieve correlations")
 
 async def generate_enhanced_analysis_summary(
@@ -1497,7 +1497,7 @@ Provide a 3-4 sentence professional coaching summary focusing on the most critic
         return response.choices[0].message.content.strip()
         
     except Exception as e:
-        print(f"Error generating enhanced AI summary: {e}")
+        pass
         base_summary = f"Comprehensive analysis of {performance_data['basic_metrics']['total_trades']} trades"
         if patterns:
             base_summary += f" detected {len(patterns)} behavioral patterns requiring attention"

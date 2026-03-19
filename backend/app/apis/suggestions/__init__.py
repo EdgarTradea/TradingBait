@@ -1,9 +1,10 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-import databutton as db
 from openai import OpenAI
 import json
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from datetime import datetime, timedelta
 from app.auth import AuthorizedUser
 import os
@@ -134,14 +135,20 @@ def get_user_activity_data(user_id: str, days_back: int = 30) -> Dict[str, Any]:
         # This would typically come from analytics/usage tracking
         # For now, simulate based on available data
         
-        # Check what data exists for user
-        trades_key = f"trades_{user_id}"
-        journal_key = f"journal_entries_{user_id}"
-        habits_key = f"habits_{user_id}"
+        db_firestore = firestore.client()
         
-        trades_data = db.storage.json.get(trades_key, default=[])
-        journal_data = db.storage.json.get(journal_key, default=[])
-        habits_data = db.storage.json.get(habits_key, default=[])
+        # Trades
+        trades_data = []
+        evaluations_ref = db_firestore.collection(f"users/{user_id}/evaluations").stream()
+        for eval_doc in evaluations_ref:
+            eval_id = eval_doc.id
+            trades_ref = db_firestore.collection(f"users/{user_id}/evaluations/{eval_id}/trades").stream()
+            trades_data.extend([t.to_dict() for t in trades_ref])
+            
+        # Journal and Habits
+        journal_ref = db_firestore.collection(f"journal_entries/{user_id}/entries").stream()
+        journal_data = [j.to_dict() for j in journal_ref]
+        habits_data = [j.get('habits') for j in journal_data if j.get('habits')]
         
         # Calculate usage patterns
         recent_cutoff = datetime.now() - timedelta(days=days_back)
@@ -165,7 +172,7 @@ def get_user_activity_data(user_id: str, days_back: int = 30) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error getting user activity: {e}")
+        pass
         return {
             "total_trades": 0,
             "recent_trades": 0,
@@ -180,8 +187,13 @@ def get_user_activity_data(user_id: str, days_back: int = 30) -> Dict[str, Any]:
 def get_performance_context(user_id: str, days_back: int = 30) -> Dict[str, Any]:
     """Get performance context for suggestions"""
     try:
-        trades_key = f"trades_{user_id}"
-        all_trades = db.storage.json.get(trades_key, default=[])
+        db_firestore = firestore.client()
+        all_trades = []
+        evaluations_ref = db_firestore.collection(f"users/{user_id}/evaluations").stream()
+        for eval_doc in evaluations_ref:
+            eval_id = eval_doc.id
+            trades_ref = db_firestore.collection(f"users/{user_id}/evaluations/{eval_id}/trades").stream()
+            all_trades.extend([t.to_dict() for t in trades_ref])
         
         if not all_trades:
             return {"status": "no_data", "suggestions_focus": "getting_started"}
@@ -217,7 +229,7 @@ def get_performance_context(user_id: str, days_back: int = 30) -> Dict[str, Any]
         }
         
     except Exception as e:
-        print(f"Error getting performance context: {e}")
+        pass
         return {"status": "error", "suggestions_focus": "general"}
 
 def create_suggestion_prompt(activity_data: Dict, performance_data: Dict, request: SuggestionRequest) -> str:
@@ -326,7 +338,7 @@ async def get_personalized_suggestions(request: SuggestionRequest, user: Authori
     user_id = user.sub
     
     try:
-        print(f"🎯 Generating personalized suggestions for user {user_id} - Context: {request.context}")
+        pass
         
         # Get user data
         activity_data = get_user_activity_data(user_id, 30)
@@ -459,7 +471,7 @@ async def get_personalized_suggestions(request: SuggestionRequest, user: Authori
         
         confidence_score = 0.8 if len(suggestions) > 2 else 0.6
         
-        print(f"✅ Generated {len(suggestions)} personalized suggestions for user {user_id}")
+        pass
         
         return SuggestionResponse(
             suggestions=suggestions,
@@ -476,7 +488,7 @@ async def get_personalized_suggestions(request: SuggestionRequest, user: Authori
         )
         
     except Exception as e:
-        print(f"❌ Error generating suggestions: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error generating suggestions: {str(e)}")
 
 @router.post("/features")
@@ -485,7 +497,7 @@ async def recommend_features(request: FeatureRecommendationRequest, user: Author
     user_id = user.sub
     
     try:
-        print(f"🔧 Recommending features for user {user_id} on page: {request.current_page}")
+        pass
         
         # Get user activity data
         activity_data = get_user_activity_data(user_id, 30)
@@ -532,7 +544,7 @@ async def recommend_features(request: FeatureRecommendationRequest, user: Author
         )
         
     except Exception as e:
-        print(f"❌ Error recommending features: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error recommending features: {str(e)}")
 
 @router.post("/optimize")
@@ -541,7 +553,7 @@ async def get_optimization_suggestions(request: OptimizationRequest, user: Autho
     user_id = user.sub
     
     try:
-        print(f"⚡ Creating optimization plan for user {user_id} - Type: {request.optimization_type}")
+        pass
         
         # Get relevant data
         activity_data = get_user_activity_data(user_id, 30)
@@ -615,7 +627,7 @@ async def get_optimization_suggestions(request: OptimizationRequest, user: Autho
         )
         
     except Exception as e:
-        print(f"❌ Error creating optimization plan: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error creating optimization plan: {str(e)}")
 
-print("🎯 Consolidated Suggestions API loaded successfully")
+pass

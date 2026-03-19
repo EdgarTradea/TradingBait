@@ -8,9 +8,9 @@ def configure_monitoring(app: FastAPI) -> None:
     try:
         # Add performance monitoring middleware
         app.add_middleware(PerformanceMonitoringMiddleware)
-        print("✅ Performance monitoring middleware added successfully")
+        pass
     except Exception as e:
-        print(f"❌ Failed to add performance monitoring middleware: {e}")
+        pass
 
 def get_monitoring_status() -> dict:
     """Get the status of monitoring configuration"""

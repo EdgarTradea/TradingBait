@@ -137,7 +137,7 @@ def sanitize_trade_data(trades: List[Dict[str, Any]]) -> List[TradeData]:
             trade_data = TradeData.from_dict(trade)
             sanitized_trades.append(trade_data)
         except Exception as e:
-            print(f"Warning: Failed to sanitize trade data: {e}")
+            pass
             continue
     
     return sanitized_trades
@@ -169,7 +169,7 @@ def parse_datetime_flexible(date_str: Optional[str]) -> Optional[datetime]:
     try:
         return datetime.fromisoformat(clean_date_str)
     except ValueError:
-        print(f"Warning: Could not parse datetime: {date_str}")
+        pass
         return None
 
 def format_duration(seconds: float) -> str:

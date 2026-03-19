@@ -93,7 +93,7 @@ async def get_real_time_summary():
         )
         
     except Exception as e:
-        print(f"❌ Error getting real-time summary: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get real-time traffic summary")
 
 @router.get("/business-metrics", response_model=BusinessMetricsResponse)
@@ -130,7 +130,7 @@ async def get_business_metrics(
         )
         
     except Exception as e:
-        print(f"❌ Error getting business metrics: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get business metrics")
 
 @router.get("/endpoint-analytics", response_model=EndpointAnalyticsResponse)
@@ -165,7 +165,7 @@ async def get_endpoint_analytics(
         )
         
     except Exception as e:
-        print(f"❌ Error getting endpoint analytics: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get endpoint analytics")
 
 @router.get("/user-behavior", response_model=UserBehaviorResponse)
@@ -187,7 +187,7 @@ async def get_user_behavior(
         )
         
     except Exception as e:
-        print(f"❌ Error getting user behavior: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get user behavior analytics")
 
 @router.get("/system-health", response_model=SystemHealthResponse)
@@ -219,7 +219,7 @@ async def get_system_health(
         )
         
     except Exception as e:
-        print(f"❌ Error getting system health: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get system health metrics")
 
 @router.get("/historical-trends", response_model=HistoricalTrendsResponse)
@@ -251,7 +251,7 @@ async def get_historical_trends(
         )
         
     except Exception as e:
-        print(f"❌ Error getting historical trends: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get historical trends")
 
 @router.get("/alerts-check")
@@ -302,7 +302,7 @@ async def check_traffic_alerts():
         }
         
     except Exception as e:
-        print(f"❌ Error checking alerts: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to check traffic alerts")
 
 # Helper functions

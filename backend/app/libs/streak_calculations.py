@@ -120,7 +120,7 @@ def parse_date_flexible(date_str: str) -> Optional[date]:
         except ValueError:
             continue
     
-    print(f"Warning: Could not parse date: {date_str}")
+    pass
     return None
 
 def get_date_range(start_date: date, end_date: date) -> List[date]:

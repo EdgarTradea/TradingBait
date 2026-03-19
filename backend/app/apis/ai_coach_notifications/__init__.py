@@ -114,7 +114,7 @@ async def signup_for_ai_coach_notifications(request: NotificationSignupRequest) 
             server.sendmail("your_email@gmail.com", request.email, msg.as_string())
             server.quit()
         except Exception as email_error:
-            print(f"Email sending failed: {email_error}")
+            pass
             # Continue anyway - signup was successful
         
         return NotificationSignupResponse(
@@ -124,7 +124,7 @@ async def signup_for_ai_coach_notifications(request: NotificationSignupRequest) 
         )
         
     except Exception as e:
-        print(f"Error in signup: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to register for notifications")
 
 @router.get("/stats", response_model=GetNotificationStatsResponse)
@@ -165,5 +165,5 @@ async def get_notification_stats() -> GetNotificationStatsResponse:
         )
         
     except Exception as e:
-        print(f"Error getting stats: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get notification stats")

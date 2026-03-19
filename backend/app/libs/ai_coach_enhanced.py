@@ -134,7 +134,7 @@ async def generate_tough_love_response(
         }
         
     except Exception as e:
-        print(f"Error in tough love coaching response: {e}")
+        pass
         return {
             "response": "Look, I'm having some technical difficulties right now, but that doesn't excuse sloppy trading. Keep journaling your trades and emotions - we'll get back to serious coaching once I'm back online.",
             "session_id": session_id,
@@ -185,12 +185,12 @@ async def prepare_coaching_data_context(user_id: str) -> Dict[str, Any]:
             "user_id": user_id
         }
         
-        print(f"Prepared coaching data context for user: {user_id}")
-        print(f"Data loaded: {len(trades)} trades, {len(journal_entries)} journal entries")
+        pass
+        pass
         return data_context
         
     except Exception as e:
-        print(f"Error preparing coaching data context: {e}")
+        pass
         return {
             "data_summary": {
                 "total_trades": 0,

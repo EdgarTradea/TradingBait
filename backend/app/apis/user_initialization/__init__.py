@@ -1,6 +1,5 @@
 import firebase_admin
 from firebase_admin import credentials, firestore
-import databutton as db
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, EmailStr
 from typing import Optional
@@ -36,7 +35,7 @@ class UserInitializationResponse(BaseModel):
 async def initialize_user(request: UserInitializationRequest, user: AuthorizedUser):
     """Initialize a new user in Firestore and our storage systems"""
     try:
-        print(f"Initializing user: {request.user_id} with email: {request.email}")
+        pass
         
         # Verify the requesting user is the same as the user being initialized (security check)
         if user.sub != request.user_id:
@@ -65,24 +64,18 @@ async def initialize_user(request: UserInitializationRequest, user: AuthorizedUs
             
             user_doc_ref.set(user_data)
             user_created = True
-            print(f"Created Firestore user document for {request.user_id}")
+            pass
         else:
             # Update last login time
             user_doc_ref.update({
                 "last_login": datetime.now(timezone.utc).isoformat()
             })
-            print(f"Updated last login for existing user {request.user_id}")
+            pass
         
-        # Initialize user preferences in storage
-        sanitized_user_id = sanitize_storage_key(request.user_id.replace('.', '_').replace('@', '_at_'))
-        preferences_key = f"user_preferences_{sanitized_user_id}"
-        
-        try:
-            # Check if preferences already exist
-            existing_prefs = db.storage.json.get(preferences_key)
-            print(f"User preferences already exist for {request.user_id}")
-        except:
-            # Create default preferences
+        # Initialize user preferences in Firestore
+        pref_ref = db_firestore.collection("users").document(request.user_id).collection("settings").document("preferences")
+        pref_doc = pref_ref.get()
+        if not pref_doc.exists:
             default_preferences = {
                 "user_id": request.user_id,
                 "email": request.email,
@@ -101,9 +94,7 @@ async def initialize_user(request: UserInitializationRequest, user: AuthorizedUs
                 },
                 "created_at": datetime.now(timezone.utc).isoformat()
             }
-            
-            db.storage.json.put(preferences_key, default_preferences)
-            print(f"Created default preferences for {request.user_id}")
+            pref_ref.set(default_preferences)
         
         # Send welcome email if this is a new user
         if user_created and request.email:
@@ -115,9 +106,9 @@ async def initialize_user(request: UserInitializationRequest, user: AuthorizedUs
                 #     "signup_method": request.provider_id or "email",
                 #     "user_name": request.display_name
                 # })
-                print(f"Welcome email queued for {request.email} (Email service temporarily disabled)")
+                pass
             except Exception as e:
-                print(f"Failed to send welcome email: {e}")
+                pass
                 # Don't fail the whole process if email fails
         
         return UserInitializationResponse(
@@ -130,7 +121,7 @@ async def initialize_user(request: UserInitializationRequest, user: AuthorizedUs
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error initializing user: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to initialize user: {str(e)}")
 
 @router.post("/auto-initialize")
@@ -153,26 +144,20 @@ async def auto_initialize_user(user: AuthorizedUser):
         return await initialize_user(request, user)
         
     except Exception as e:
-        print(f"Error in auto-initialization: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Auto-initialization failed: {str(e)}")
 
 @router.get("/health")
 def user_initialization_health_check():
     """Health check for user initialization system"""
     try:
-        # Test Firestore connection
         db_firestore = firestore.client()
-        test_collection = db_firestore.collection("system_health")
-        
-        # Test storage connection
-        test_key = "user_init_health_check"
-        test_data = {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
-        db.storage.json.put(test_key, test_data)
-        
+        db_firestore.collection("system").document("user_init_health").set(
+            {"status": "healthy", "timestamp": datetime.now(timezone.utc).isoformat()}
+        )
         return {
             "status": "healthy",
             "firestore": "connected",
-            "storage": "available",
             "timestamp": datetime.now(timezone.utc).isoformat()
         }
     except Exception as e:

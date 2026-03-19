@@ -20,7 +20,7 @@ class _InfrastructureMonitor:
             failures.append({**details, "timestamp": datetime.now().isoformat()})
             db.storage.json.put(key, failures[-500:])  # keep last 500
         except Exception as e:
-            print(f"Failed to log subscription failure: {e}")
+            pass
 
     def get_recent_failure_stats(self, hours: int = 24) -> dict:
         return {
@@ -89,7 +89,7 @@ async def get_infrastructure_health(user: AuthorizedUser) -> InfrastructureHealt
         return InfrastructureHealthResponse(**health_summary)
         
     except Exception as e:
-        print(f"❌ Error getting infrastructure health: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to check infrastructure health: {str(e)}")
 
 @router.get("/subscription-failures", response_model=SubscriptionFailureStats)
@@ -111,7 +111,7 @@ async def get_subscription_failure_stats(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ Error getting subscription failure stats: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to get failure statistics: {str(e)}")
 
 @router.post("/log-subscription-failure")
@@ -141,7 +141,7 @@ async def log_subscription_failure(
         }
         
     except Exception as e:
-        print(f"❌ Error logging subscription failure: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to log failure: {str(e)}")
 
 @router.get("/system-health")
@@ -172,7 +172,7 @@ async def get_system_health() -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"❌ System health check failed: {e}")
+        pass
         return {
             'status': 'unhealthy',
             'timestamp': datetime.now().isoformat(),

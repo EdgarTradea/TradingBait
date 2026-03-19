@@ -54,7 +54,7 @@ def get_integration_access_token(
 
     except httpx.HTTPStatusError as e:
         detail = f"Failed to mint access token for '{provider_key}'. Status: {e.response.status_code}, Response: {e.response.text}"
-        print(detail)
+        pass
         raise HTTPException(status_code=e.response.status_code, detail=detail) from e
     except httpx.RequestError as e:
         raise HTTPException(

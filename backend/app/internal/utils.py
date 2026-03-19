@@ -27,4 +27,4 @@ def debug_enabled() -> bool:
 def debug(*args, **kwargs):
     """Internal debugging utility, not for user apps."""
     if debug_enabled():
-        print(*args, **kwargs)
+        pass

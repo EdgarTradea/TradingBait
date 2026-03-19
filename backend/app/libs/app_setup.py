@@ -91,7 +91,7 @@ def create_enhanced_app() -> FastAPI:
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allow_headers=["*"],
         )
-        print("🔒 Production CORS middleware configured for tradingbait.com")
+        pass
     else:
         app.add_middleware(
             CORSMiddleware,
@@ -105,13 +105,13 @@ def create_enhanced_app() -> FastAPI:
             allow_methods=["GET", "POST", "PUT", "DELETE", "OPTIONS"],
             allow_headers=["*"],
         )
-        print("🔒 Development CORS middleware configured for riff.new")
+        pass
     
     # Add traffic analytics middleware
     traffic_middleware = TrafficAnalyticsMiddleware(app)
     app.add_middleware(TrafficAnalyticsMiddleware)
     
-    print("🚀 Traffic Analytics Middleware mounted - comprehensive monitoring active")
+    pass
     
     # Include all routers with auth dependencies
     app.include_router(adminRouter, dependencies=[Depends(get_authorized_user)])
@@ -172,9 +172,9 @@ def create_enhanced_app() -> FastAPI:
     app.include_router(withdrawals_refundsRouter, dependencies=[Depends(get_authorized_user)])
 
     if mode == Mode.PROD:
-        print("API running on host: https://www.tradingbait.com")
+        pass
     else:
-        print("API running on host: https://riff.new")
+        pass
 
     return app
 

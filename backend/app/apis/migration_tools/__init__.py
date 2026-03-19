@@ -27,7 +27,7 @@ async def migrate_journal_data_endpoint(user: AuthorizedUser):
             data=result
         )
     except Exception as e:
-        print(f"Migration error: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Migration failed: {str(e)}")
 
 @router.post("/migrate-user-data", response_model=MigrationResponse)
@@ -41,7 +41,7 @@ async def migrate_user_data_endpoint(user: AuthorizedUser):
             data=result
         )
     except Exception as e:
-        print(f"User migration error: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"User migration failed: {str(e)}")
 
 @router.post("/cleanup-legacy-storage", response_model=MigrationResponse)
@@ -55,7 +55,7 @@ async def cleanup_legacy_storage_endpoint(dry_run: bool = True, user: Authorized
             data=result
         )
     except Exception as e:
-        print(f"Cleanup error: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Cleanup failed: {str(e)}")
 
 @router.get("/migration-status")

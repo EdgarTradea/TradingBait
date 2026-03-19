@@ -79,7 +79,6 @@ function TradesContent() {
       setHasError(false);
       await fetchTrades(user.uid);
     } catch (error: any) {
-      console.error('Error fetching trades:', error);
       setHasError(true);
       setErrorMessage(error.message || 'Failed to load trades');
     }
@@ -238,9 +237,8 @@ function TradesContent() {
         const error = await response.json();
         toast.error(error.detail || "Failed to delete evaluation trades");
       }
-    } catch (error) {
-      console.error("Error deleting evaluation trades:", error);
-      toast.error("Failed to delete evaluation trades");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete evaluation trades");
     } finally {
       setIsDeletingByAccount(false);
     }
@@ -263,9 +261,8 @@ function TradesContent() {
         const error = await response.json();
         toast.error(error.detail || "Failed to delete all trades");
       }
-    } catch (error) {
-      console.error("Error deleting all trades:", error);
-      toast.error("Failed to delete all trades");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete all trades");
     } finally {
       setIsDeletingAllTrades(false);
     }
@@ -400,9 +397,8 @@ function TradesContent() {
         const error = await response.json();
         toast.error(error.detail || "Failed to delete trade");
       }
-    } catch (error) {
-      console.error("Error deleting individual trade:", error);
-      toast.error("Failed to delete trade");
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to delete trade");
     } finally {
       setDeletingTradeId(null);
     }
@@ -415,8 +411,8 @@ function TradesContent() {
       try {
         const userEvaluations = await getEvaluations(user.uid);
         setEvaluations(userEvaluations);
-      } catch (error) {
-        console.error("Error loading evaluations:", error);
+      } catch (error: any) {
+        toast.error(error?.message || "Failed to load evaluations");
       }
     };
     loadEvaluations();
@@ -507,7 +503,6 @@ function TradesContent() {
         throw new Error(processResult.message || "File processing failed");
       }
     } catch (error: any) {
-      console.error("Upload error:", error);
       toast.error(error.message || "Failed to upload file");
       setUploadProgress("");
     } finally {
@@ -531,8 +526,8 @@ function TradesContent() {
         fetchTrades(user.uid),
         loadEvaluations()
       ]);
-    } catch (error) {
-      console.error('Error fetching initial data:', error);
+    } catch (error: any) {
+      toast.error(error?.message || "Error fetching initial data");
     }
   };
   
@@ -600,9 +595,8 @@ function TradesContent() {
       setIsNotesModalOpen(false);
       setEditingTradeId(null);
       setCurrentNotes('');
-    } catch (error) {
-      toast.error('Failed to save notes');
-      console.error('Error saving notes:', error);
+    } catch (error: any) {
+      toast.error(error?.message || "Failed to save notes");
     } finally {
       setIsSavingNotes(false);
     }

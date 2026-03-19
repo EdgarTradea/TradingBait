@@ -168,7 +168,7 @@ def retry_with_backoff(config: RetryConfig = None):
                     if config.jitter:
                         delay *= (0.5 + random.random() * 0.5)  # 50-100% of calculated delay
                     
-                    print(f"Retry attempt {attempt + 1}/{config.max_attempts} after {delay:.2f}s for {func.__name__}")
+                    pass
                     await asyncio.sleep(delay)
             
             # If we get here, all retries failed
@@ -219,7 +219,7 @@ def retry_with_backoff(config: RetryConfig = None):
                     if config.jitter:
                         delay *= (0.5 + random.random() * 0.5)
                     
-                    print(f"Retry attempt {attempt + 1}/{config.max_attempts} after {delay:.2f}s for {func.__name__}")
+                    pass
                     time.sleep(delay)
             
             if isinstance(last_exception, ResilientError):

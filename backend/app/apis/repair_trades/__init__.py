@@ -13,6 +13,7 @@ import uuid
 from app.auth import AuthorizedUser
 import os
 from app.libs.firebase_init import initialize_firebase
+from firebase_admin import storage
 
 router = APIRouter()
 
@@ -65,14 +66,14 @@ async def repair_trades_datetime(request: RepairTradesRequest) -> RepairTradesRe
             evaluations_docs = evaluations_ref.get()
             evaluation_ids = [doc.id for doc in evaluations_docs]
         
-        print(f"Processing {len(evaluation_ids)} evaluations for user {request.user_id}")
+        pass
         
         for eval_id in evaluation_ids:
             # Get all trades for this evaluation
             trades_ref = firestore_db.collection(f'users/{request.user_id}/evaluations/{eval_id}/trades')
             trades_docs = trades_ref.get()
             
-            print(f"Processing {len(trades_docs)} trades in evaluation {eval_id}")
+            pass
             
             for trade_doc in trades_docs:
                 stats["trades_analyzed"] += 1
@@ -108,7 +109,7 @@ async def repair_trades_datetime(request: RepairTradesRequest) -> RepairTradesRe
                             'closeTime': extracted_datetime['closeTime'],
                             'repaired_at': datetime.now().isoformat()
                         })
-                        print(f"Repaired trade {trade_doc.id} with openTime: {extracted_datetime['openTime']}, closeTime: {extracted_datetime['closeTime']}")
+                        pass
                 
                 else:
                     stats["trades_no_datetime_found"] += 1
@@ -123,7 +124,7 @@ async def repair_trades_datetime(request: RepairTradesRequest) -> RepairTradesRe
         )
         
     except Exception as e:
-        print(f"Error repairing trades: {e}")
+        pass
         import traceback
         traceback.print_exc()
         raise HTTPException(status_code=500, detail=f"Failed to repair trades: {str(e)}")
@@ -179,15 +180,19 @@ async def extract_missing_first_trade(user: AuthorizedUser) -> ExtractMissingTra
         user_id = user.sub
         
         # Try to get the most recent uploaded file
+        initialize_firebase()
+        bucket = storage.bucket()
+        
         file_content = None
-        file_keys = [f"recent_upload_{user_id}", f"upload_{user_id}", "recent_upload"]
+        file_keys = [f"uploads/{user_id}/recent", f"trade_imports/{user_id}/recent_upload"]
         
         for key in file_keys:
             try:
-                file_content = db.storage.binary.get(key)
-                print(f"Found file at key: {key}")
-                break
-            except FileNotFoundError:
+                blob = bucket.blob(key)
+                if blob.exists():
+                    file_content = blob.download_as_bytes()
+                    break
+            except Exception:
                 continue
                 
         if not file_content:
@@ -203,7 +208,7 @@ async def extract_missing_first_trade(user: AuthorizedUser) -> ExtractMissingTra
         lines = file_text.split('\n')
         non_empty_lines = [line.strip() for line in lines if line.strip()]
         
-        print(f"File has {len(non_empty_lines)} non-empty lines")
+        pass
         
         if len(non_empty_lines) < 2:
             return ExtractMissingTradeResponse(
@@ -216,8 +221,8 @@ async def extract_missing_first_trade(user: AuthorizedUser) -> ExtractMissingTra
         # Parse with pandas to get the first row
         df = pd.read_csv(io.StringIO(file_text))
         
-        print(f"DataFrame has {len(df)} rows")
-        print(f"Columns: {list(df.columns)}")
+        pass
+        pass
         
         if len(df) == 0:
             return ExtractMissingTradeResponse(
@@ -241,7 +246,7 @@ async def extract_missing_first_trade(user: AuthorizedUser) -> ExtractMissingTra
                 message="Could not extract valid trade data from first row."
             )
         
-        print(f"Extracted missing trade: {missing_trade}")
+        pass
         
         # Check if this trade already exists in Firestore
         firestore_db = firestore.client()
@@ -264,7 +269,7 @@ async def extract_missing_first_trade(user: AuthorizedUser) -> ExtractMissingTra
                 if (existing_data.get("symbol") == missing_trade.get("symbol") and 
                     existing_data.get("openTime") == missing_trade.get("openTime")):
                     trade_exists = True
-                    print(f"Trade already exists in evaluation {evaluation_id}")
+                    pass
                     break
             
             if trade_exists:
@@ -308,7 +313,7 @@ async def extract_missing_first_trade(user: AuthorizedUser) -> ExtractMissingTra
         trade_ref = firestore_db.collection(f"users/{user_id}/evaluations/{evaluation_id}/trades").document(trade_id)
         trade_ref.set(missing_trade)
         
-        print(f"Added missing trade to evaluation {evaluation_id} with ID {trade_id}")
+        pass
         
         return ExtractMissingTradeResponse(
             success=True,
@@ -319,7 +324,7 @@ async def extract_missing_first_trade(user: AuthorizedUser) -> ExtractMissingTra
         )
         
     except Exception as e:
-        print(f"Error in repair process: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Repair failed: {str(e)}")
 
 

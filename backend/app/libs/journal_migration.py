@@ -40,12 +40,12 @@ def extract_date_from_filename(filename: str) -> Optional[str]:
 
 def migrate_user_journal_data(user_id: str) -> Dict[str, Any]:
     """Migrate all journal data for a specific user to unified format"""
-    print(f"🔄 Migrating data for user: {user_id}")
+    pass
     
     storage_files = db.storage.json.list()
     user_files = [f for f in storage_files if user_id in f.name and 'journal' in f.name.lower()]
     
-    print(f"   Found {len(user_files)} files for user")
+    pass
     
     # Collect all journal entries by date
     unified_entries = {}  # date -> journal_entry
@@ -55,26 +55,26 @@ def migrate_user_journal_data(user_id: str) -> Dict[str, Any]:
         date = extract_date_from_filename(filename)
         
         if not date:
-            print(f"   ⚠️  Skipping file without date: {filename}")
+            pass
             continue
             
         try:
             file_data = db.storage.json.get(filename)
             
             if not isinstance(file_data, dict):
-                print(f"   ⚠️  Skipping invalid data in: {filename}")
+                pass
                 continue
                 
             # Handle different file types
             if filename.startswith('journal_entry_'):
                 # Already in unified format
                 unified_entries[date] = file_data
-                print(f"   ✅ Found unified entry for {date}")
+                pass
                 
             elif filename.startswith('journal_'):
                 # Legacy format - convert to unified
                 unified_entries[date] = file_data
-                print(f"   🔄 Converted legacy entry for {date}")
+                pass
                 
             elif filename.startswith('user_journals_'):
                 # Index array format
@@ -83,13 +83,13 @@ def migrate_user_journal_data(user_id: str) -> Dict[str, Any]:
                         if isinstance(entry, dict) and 'date' in entry:
                             entry_date = entry['date']
                             unified_entries[entry_date] = entry
-                            print(f"   🔄 Extracted from index: {entry_date}")
+                            pass
                 elif isinstance(file_data, dict) and 'entries' in file_data:
                     for entry in file_data['entries']:
                         if isinstance(entry, dict) and 'date' in entry:
                             entry_date = entry['date']
                             unified_entries[entry_date] = entry
-                            print(f"   🔄 Extracted from index: {entry_date}")
+                            pass
                             
             elif filename.startswith('habit_completion_'):
                 # Separate habit storage - merge with existing entry or create new
@@ -97,7 +97,7 @@ def migrate_user_journal_data(user_id: str) -> Dict[str, Any]:
                     # Merge habits into existing entry
                     if 'habit_completions' in file_data:
                         unified_entries[date]['habits'] = file_data['habit_completions']
-                        print(f"   🔄 Merged habits into {date}")
+                        pass
                 else:
                     # Create minimal entry with just habits
                     unified_entries[date] = {
@@ -117,10 +117,10 @@ def migrate_user_journal_data(user_id: str) -> Dict[str, Any]:
                         'created_at': file_data.get('created_at', datetime.now().isoformat()),
                         'updated_at': datetime.now().isoformat()
                     }
-                    print(f"   🔄 Created entry from habits for {date}")
+                    pass
                     
         except Exception as e:
-            print(f"   ❌ Error processing {filename}: {e}")
+            pass
             continue
     
     # Save all unified entries
@@ -137,7 +137,7 @@ def migrate_user_journal_data(user_id: str) -> Dict[str, Any]:
             saved_count += 1
             
         except Exception as e:
-            print(f"   ❌ Error saving unified entry for {date}: {e}")
+            pass
     
     result = {
         'user_id': user_id,
@@ -146,12 +146,12 @@ def migrate_user_journal_data(user_id: str) -> Dict[str, Any]:
         'dates_consolidated': list(unified_entries.keys())
     }
     
-    print(f"   ✅ Migration complete: {saved_count} entries saved")
+    pass
     return result
 
 def migrate_all_journal_data() -> Dict[str, Any]:
     """Migrate all journal data across all users to unified format"""
-    print("🚀 Starting comprehensive journal data migration...")
+    pass
     
     # Find all users with journal data
     storage_files = db.storage.json.list()
@@ -164,8 +164,8 @@ def migrate_all_journal_data() -> Dict[str, Any]:
         if user_id and len(user_id) > 10:  # Filter out invalid user IDs
             user_ids.add(user_id)
     
-    print(f"📊 Found {len(user_ids)} users with journal data")
-    print(f"📊 Total journal files to process: {len(journal_files)}")
+    pass
+    pass
     
     # Migrate each user
     migration_results = []
@@ -174,7 +174,7 @@ def migrate_all_journal_data() -> Dict[str, Any]:
             result = migrate_user_journal_data(user_id)
             migration_results.append(result)
         except Exception as e:
-            print(f"❌ Failed to migrate user {user_id}: {e}")
+            pass
             migration_results.append({
                 'user_id': user_id,
                 'error': str(e),
@@ -196,16 +196,16 @@ def migrate_all_journal_data() -> Dict[str, Any]:
         'user_results': migration_results
     }
     
-    print(f"\n✅ Migration Summary:")
-    print(f"   Users: {successful_users}/{len(user_ids)} successful")
-    print(f"   Files: {total_files} processed")
-    print(f"   Entries: {total_entries} migrated")
+    pass
+    pass
+    pass
+    pass
     
     return summary
 
 def cleanup_legacy_storage(dry_run: bool = True) -> Dict[str, Any]:
     """Clean up legacy storage files after successful migration"""
-    print(f"🧹 {'DRY RUN: ' if dry_run else ''}Cleaning up legacy storage...")
+    pass
     
     storage_files = db.storage.json.list()
     
@@ -225,7 +225,7 @@ def cleanup_legacy_storage(dry_run: bool = True) -> Dict[str, Any]:
             not filename.startswith('journal_entry_')):
             files_to_delete.append(filename)
     
-    print(f"   Found {len(files_to_delete)} files to clean up")
+    pass
     
     if not dry_run:
         deleted_count = 0
@@ -233,17 +233,17 @@ def cleanup_legacy_storage(dry_run: bool = True) -> Dict[str, Any]:
             try:
                 # Note: We don't actually have a delete method in the SDK
                 # This would need to be implemented if we want automated cleanup
-                print(f"   Would delete: {filename}")
+                pass
                 deleted_count += 1
             except Exception as e:
-                print(f"   ❌ Error deleting {filename}: {e}")
+                pass
         
-        print(f"   ✅ Cleaned up {deleted_count} files")
+        pass
     else:
         for filename in files_to_delete[:10]:  # Show first 10
-            print(f"   Would delete: {filename}")
+            pass
         if len(files_to_delete) > 10:
-            print(f"   ... and {len(files_to_delete) - 10} more")
+            pass
     
     return {
         'files_identified': len(files_to_delete),

@@ -13,12 +13,12 @@ def from_b64(name: str, b64: str) -> str:
     try:
         value_bytes = base64.urlsafe_b64decode(b64.encode("utf-8"))
     except Exception:
-        print(f"Error(1) decoding value of secret {name}, try adding it again")
+        pass
         return ""
     try:
         value_str = value_bytes.decode("utf-8")
     except UnicodeDecodeError:
-        print(f"Error(2) decoding value of secret {name}, try adding it again")
+        pass
         value_str = value_bytes.decode("utf-8", errors="ignore")
     return value_str
 
@@ -45,11 +45,11 @@ def fetch_deployment_secrets_v2(deployment_id: str) -> dict[str, str]:
         attempt += 1
         if attempt > 5:
             break
-        print(f"Retrying secrets fetch in {delay}s after {attempt} attempts")
+        pass
         time.sleep(delay)
         delay *= 2.0
     t1 = time.monotonic()
-    print(f"Time to fetch secrets v2: {t1 - t0}")
+    pass
 
     # Can raise if the last attempt failed
     response.raise_for_status()
@@ -90,18 +90,18 @@ def fetch_deployment_secrets_v3(deployment_id: str) -> dict[str, str]:
             timeout=30.0,
         )
         if 200 <= response.status_code < 300:
-            print("Successfully fetched secrets for deployment")
+            pass
             break
 
         # Retry logic
         attempt += 1
         if attempt > 5:
             break
-        print(f"Retrying secrets fetch in {delay}s after {attempt} attempts")
+        pass
         time.sleep(delay)
         delay *= 2.0
     t1 = time.monotonic()
-    print(f"Time to fetch secrets v3: {t1 - t0}")
+    pass
 
     # Can raise if the last attempt failed
     response.raise_for_status()
@@ -112,7 +112,7 @@ def fetch_deployment_secrets_v3(deployment_id: str) -> dict[str, str]:
         if environment := cfg.environments.get(env):
             for name, var in environment.variables.items():
                 if error := var.error:
-                    print(f"Failed to fetch variable {name} from {var.ref}: {error}")
+                    pass
                 else:
                     secrets[name] = var.value
     return secrets
@@ -121,7 +121,7 @@ def fetch_deployment_secrets_v3(deployment_id: str) -> dict[str, str]:
 def fetch_and_inject_deployment_secrets() -> None:
     deployment_id = os.environ.get("DATABUTTON_DEPLOYMENT_ID")
     if not deployment_id:
-        print("Missing deployment id, not fetching secrets")
+        pass
         return
 
     try:

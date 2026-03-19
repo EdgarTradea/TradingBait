@@ -197,9 +197,9 @@ def create_discount(request: DiscountCreateRequest, user: AuthorizedUser) -> Dis
                 stripe_coupon_id = coupon.id
             # For free_trial, we'll handle it in the checkout logic
             
-            print(f"Created Stripe coupon: {stripe_coupon_id}")
+            pass
         except Exception as e:
-            print(f"Failed to create Stripe coupon, continuing without: {e}")
+            pass
         
         # Create discount record
         now = datetime.now(timezone.utc)
@@ -231,14 +231,14 @@ def create_discount(request: DiscountCreateRequest, user: AuthorizedUser) -> Dis
         existing_discounts[request.code] = discount_id
         db.storage.json.put("discount_codes_index", existing_discounts)
         
-        print(f"Created discount: {request.code} ({discount_id}) by admin {user.sub}")
+        pass
         
         return DiscountDetails(**discount_data)
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error creating discount: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to create discount: {str(e)}")
 
 @router.get("/discounts")
@@ -272,7 +272,7 @@ def list_discounts(user: AuthorizedUser, active_only: bool = False) -> List[Disc
                         discounts.append(discount)
                         
             except Exception as e:
-                print(f"Error loading discount {discount_id}: {e}")
+                pass
                 continue
         
         # Sort by creation date (newest first)
@@ -281,7 +281,7 @@ def list_discounts(user: AuthorizedUser, active_only: bool = False) -> List[Disc
         return discounts
         
     except Exception as e:
-        print(f"Error listing discounts: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to list discounts: {str(e)}")
 
 @router.get("/discounts/{discount_id}")
@@ -309,7 +309,7 @@ def get_discount(discount_id: str, user: AuthorizedUser) -> DiscountDetails:
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting discount: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to get discount: {str(e)}")
 
 @router.put("/discounts/{discount_id}")
@@ -339,7 +339,7 @@ def update_discount(discount_id: str, request: DiscountUpdateRequest, user: Auth
         # Save updated discount
         db.storage.json.put(storage_key, discount_data)
         
-        print(f"Updated discount: {discount_id} by admin {user.sub}")
+        pass
         
         # Convert datetime strings back for response
         if discount_data.get("expires_at"):
@@ -354,7 +354,7 @@ def update_discount(discount_id: str, request: DiscountUpdateRequest, user: Auth
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error updating discount: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to update discount: {str(e)}")
 
 @router.delete("/discounts/{discount_id}")
@@ -373,9 +373,9 @@ def delete_discount(discount_id: str, user: AuthorizedUser) -> Dict[str, Any]:
         if discount_data.get("stripe_coupon_id"):
             try:
                 stripe.Coupon.delete(discount_data["stripe_coupon_id"])
-                print(f"Deleted Stripe coupon: {discount_data['stripe_coupon_id']}")
+                pass
             except Exception as e:
-                print(f"Failed to delete Stripe coupon: {e}")
+                pass
         
         # Remove from index
         discount_index = db.storage.json.get("discount_codes_index", default={})
@@ -397,17 +397,17 @@ def delete_discount(discount_id: str, user: AuthorizedUser) -> Dict[str, Any]:
             # This is expected - the file doesn't exist or was already deleted
             pass
         except Exception as delete_error:
-            print(f"Warning: Could not clean up original storage entry: {delete_error}")
+            pass
             # Continue anyway as the main deletion was successful
         
-        print(f"Deleted discount: {code} ({discount_id}) by admin {user.sub}")
+        pass
         
         return {"success": True, "message": f"Discount '{code}' has been deleted"}
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting discount: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to delete discount: {str(e)}")
 
 @router.post("/apply-discount")
@@ -489,7 +489,7 @@ def apply_discount(request: ApplyDiscountRequest) -> ApplyDiscountResponse:
         )
         
     except Exception as e:
-        print(f"Error applying discount: {e}")
+        pass
         return ApplyDiscountResponse(
             valid=False,
             discount_amount=0,
@@ -536,7 +536,7 @@ def get_discount_analytics(user: AuthorizedUser) -> DiscountAnalytics:
                     })
                     
             except Exception as e:
-                print(f"Error processing discount analytics for {discount_id}: {e}")
+                pass
                 continue
         
         # Sort by usage
@@ -560,5 +560,5 @@ def get_discount_analytics(user: AuthorizedUser) -> DiscountAnalytics:
         )
         
     except Exception as e:
-        print(f"Error getting discount analytics: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to get analytics: {str(e)}")

@@ -104,7 +104,7 @@ async def get_available_prop_firms(user: AuthorizedUser) -> PropFirmListResponse
         )
         
     except Exception as e:
-        print(f"Error getting prop firms: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to retrieve prop firm data")
 
 @router.post("/set-preference")
@@ -146,7 +146,7 @@ async def set_user_prop_firm_preference(request: PropFirmPreferenceRequest, user
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error setting prop firm preference: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to update prop firm preference")
 
 @router.get("/commission-info/{prop_firm}")
@@ -164,7 +164,7 @@ async def get_prop_firm_commission_info(prop_firm: str) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting commission info: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to retrieve commission information")
 
 @router.post("/calculate-commission")
@@ -196,7 +196,7 @@ async def calculate_commission_cost(request: CommissionCalculationRequest) -> Co
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error calculating commission: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to calculate commission")
 
 @router.get("/user-preference")
@@ -223,5 +223,5 @@ async def get_user_prop_firm_preference(user: AuthorizedUser) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error getting user preference: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to retrieve user preference")

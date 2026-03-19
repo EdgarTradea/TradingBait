@@ -2,28 +2,32 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta, date
-import databutton as db
+from collections import defaultdict
+import uuid
 import pandas as pd
 import re
 from app.auth import AuthorizedUser
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 
 router = APIRouter(prefix="/routes")
+
+def _db():
+    initialize_firebase()
+    return firestore.client()
+
+def _journal_col(user_id: str):
+    return _db().collection("users").document(user_id).collection("journal")
+
+def _habits_col(user_id: str):
+    return _db().collection("users").document(user_id).collection("habits")
+
+def _moods_col(user_id: str):
+    return _db().collection("users").document(user_id).collection("moods")
 
 # ============================================================================
 # UTILITY FUNCTIONS
 # ============================================================================
-
-def sanitize_storage_key(key: str) -> str:
-    """Sanitize storage key to only allow alphanumeric and ._- symbols"""
-    return re.sub(r'[^a-zA-Z0-9._-]', '', key)
-
-def get_user_journal_key(user_id: str) -> str:
-    """Get storage key for user's journal entries"""
-    return sanitize_storage_key(f"journal_entries_{user_id}")
-
-def get_user_habits_key(user_id: str) -> str:
-    """Get storage key for user's habit definitions"""
-    return sanitize_storage_key(f"habit_definitions_{user_id}")
 
 def is_valid_date(date_str: str) -> bool:
     """Validate date string format"""
@@ -32,72 +36,6 @@ def is_valid_date(date_str: str) -> bool:
         return True
     except ValueError:
         return False
-
-def get_user_journal_entry_key(user_id: str, date: str) -> str:
-    """Generate journal entry storage key"""
-    return f"journal_entry_{user_id}_{date}"
-
-def get_user_journal_entry_key_legacy(user_id: str, date: str) -> str:
-    """Generate legacy journal entry storage key (for backward compatibility)"""
-    return f"journal_{user_id}_{date}"
-
-def update_journal_index(user_id: str, date_str: str, remove: bool = False):
-    """Update the journal index to track which dates have entries"""
-    try:
-        journal_key = get_user_journal_key(user_id)
-        journal_index = db.storage.json.get(journal_key, default={})
-        
-        if remove:
-            # Remove from index
-            if date_str in journal_index:
-                del journal_index[date_str]
-        else:
-            # Add to index
-            journal_index[date_str] = True
-
-        db.storage.json.put(journal_key, journal_index)
-        print(f"Updated journal index for user {user_id}: {'removed' if remove else 'added'} {date_str}")
-    except Exception as e:
-        print(f"Error updating journal index: {e}")
-
-def update_batch_storage(user_id: str, entry_data: Dict, remove: bool = False):
-    """Update batch storage with new/updated/deleted entry - PERFORMANCE OPTIMIZATION"""
-    try:
-        batch_key = f"journal_entries_batch_{user_id}"
-        
-        # Get current batch entries
-        batch_entries = db.storage.json.get(batch_key, default=[])
-        
-        if not isinstance(batch_entries, list):
-            batch_entries = []
-        
-        entry_date = entry_data.get('date')
-        if not entry_date:
-            print(f"Warning: No date found in entry data, skipping batch update")
-            return
-        
-        if remove:
-            # Remove entry from batch
-            batch_entries = [e for e in batch_entries if e.get('date') != entry_date]
-            print(f"📦 BATCH: Removed entry for {entry_date} from batch storage")
-        else:
-            # Add or update entry in batch
-            # Remove existing entry for this date first
-            batch_entries = [e for e in batch_entries if e.get('date') != entry_date]
-            # Add the new/updated entry
-            batch_entries.append(entry_data)
-            print(f"📦 BATCH: Updated entry for {entry_date} in batch storage")
-        
-        # Sort entries by date (newest first) for consistent ordering
-        batch_entries.sort(key=lambda x: x.get('date', ''), reverse=True)
-        
-        # Save updated batch
-        db.storage.json.put(batch_key, batch_entries)
-        print(f"📦 BATCH: Batch storage updated with {len(batch_entries)} total entries")
-        
-    except Exception as e:
-        print(f"Warning: Failed to update batch storage: {e}")
-        # Don't raise exception - batch storage is optimization, not critical
 
 # ============================================================================
 # PYDANTIC MODELS
@@ -294,23 +232,11 @@ class AnalyticsResponse(BaseModel):
 # ============================================================================
 
 def load_user_habit_definitions(user_id: str) -> List[HabitDefinition]:
-    """Load habit definitions for a specific user"""
+    """Load habit definitions for a specific user from Firestore"""
     try:
-        habits_key = get_user_habits_key(user_id)
-        habits_data = db.storage.json.get(habits_key, default=[])
-        
-        # Convert to HabitDefinition objects and filter out inactive habits
-        habit_definitions = []
-        for habit_data in habits_data:
-            if isinstance(habit_data, dict):
-                habit_def = HabitDefinition(**habit_data)
-                # Only include active habits
-                if habit_def.is_active:
-                    habit_definitions.append(habit_def)
-        
-        return habit_definitions
-    except Exception as e:
-        print(f"Error loading habit definitions for user {user_id}: {e}")
+        docs = _habits_col(user_id).where("is_active", "==", True).stream()
+        return [HabitDefinition(**doc.to_dict()) for doc in docs]
+    except Exception:
         return []
 
 def create_habits_from_definitions(habit_definitions: List[HabitDefinition]) -> List[Habit]:
@@ -342,21 +268,14 @@ async def create_journal_entry(request: CreateJournalEntryRequest, user: Authori
     """Create a new journal entry"""
     try:
         user_id = user.sub
-        print(f"🔍 VALIDATION: Successfully parsed request for user {user_id}")
-        print(f"🔍 VALIDATION: Date={request.date}, Mood={request.mood}, Energy={request.energy_level}")
-        print(f"🔍 VALIDATION: Habits count={len(request.habits)}")
-        
+
         if not is_valid_date(request.date):
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        # Check if entry already exists using unified storage pattern
-        journal_key = get_user_journal_entry_key(user_id, request.date)
-        try:
-            existing_entry = db.storage.json.get(journal_key)
-            if existing_entry:
-                raise HTTPException(status_code=400, detail="Journal entry for this date already exists")
-        except FileNotFoundError:
-            pass  # Good, no existing entry
+
+        # Check if entry already exists in Firestore
+        existing_doc = _journal_col(user_id).document(request.date).get()
+        if existing_doc.exists:
+            raise HTTPException(status_code=400, detail="Journal entry for this date already exists")
         
         # If no habits provided, use user's habit definitions
         habits = request.habits
@@ -385,9 +304,8 @@ async def create_journal_entry(request: CreateJournalEntryRequest, user: Authori
             updated_at=datetime.now().isoformat()
         )
 
-        # Store using unified pattern: individual file per date
-        db.storage.json.put(journal_key, journal_entry.dict())
-        print(f"✅ SAVE: Stored journal entry at key: {journal_key}")
+        # Store in Firestore using date as document ID
+        _journal_col(user_id).document(request.date).set(journal_entry.dict())
         
         return JournalResponse(
             success=True,
@@ -398,7 +316,7 @@ async def create_journal_entry(request: CreateJournalEntryRequest, user: Authori
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error creating journal entry: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to create journal entry")
 
 @router.get("/entries", response_model=JournalListResponse)
@@ -431,7 +349,7 @@ async def get_journal_entries(user: AuthorizedUser, limit: int = 30, offset: int
                 entry = JournalEntry(**entry_data)
                 entries.append(entry)
             except Exception as e:
-                print(f"Error converting journal entry: {e}")
+                pass
                 continue
         
         return JournalListResponse(
@@ -442,7 +360,7 @@ async def get_journal_entries(user: AuthorizedUser, limit: int = 30, offset: int
         )
         
     except Exception as e:
-        print(f"Error getting journal entries: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get journal entries")
 
 @router.get("/entries/{entry_date}", response_model=JournalResponse)
@@ -450,80 +368,29 @@ async def get_journal_entry_by_date(entry_date: str, user: AuthorizedUser):
     """Get a specific journal entry by date"""
     try:
         user_id = user.sub
-        
+
         if not is_valid_date(entry_date):
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        journal_key = get_user_journal_entry_key(user_id, entry_date)
-        print(f"🔍 RETRIEVE: user_id={user_id}, date={entry_date}, storage_key={journal_key}")
-        
-        try:
-            # First try individual file storage
-            entry_data = db.storage.json.get(journal_key)
-            
-            # Check if data is corrupted (not a dict)
-            if not isinstance(entry_data, dict):
-                print(f"Warning: Corrupted journal entry detected for {entry_date} (user {user_id}): data is {type(entry_data)}, not dict")
-                print(f"Corrupted data preview: {str(entry_data)[:100]}...")
-                
-                # Return 404 so frontend knows entry doesn't exist (in usable form)
-                raise HTTPException(status_code=404, detail="Journal entry not found")
-            
-            # Ensure user_id matches for security
-            if entry_data.get('user_id') != user_id:
-                raise HTTPException(status_code=404, detail="Journal entry not found")
-            
-            entry = JournalEntry(**entry_data)
-            return JournalResponse(
-                success=True,
-                entry=entry,
-                message="Journal entry retrieved successfully"
-            )
-            
-        except FileNotFoundError:
-            # If individual file not found, check the journal index (backward compatibility)
-            try:
-                index_key = f"journal_entries_{user_id}"
-                journal_index = db.storage.json.get(index_key, default=[])
-                
-                if isinstance(journal_index, list):
-                    # Find entry with matching date
-                    for entry_data in journal_index:
-                        if isinstance(entry_data, dict) and entry_data.get('date') == entry_date:
-                            entry = JournalEntry(**entry_data)
-                            return JournalResponse(
-                                success=True,
-                                entry=entry,
-                                message="Journal entry retrieved successfully"
-                            )
-                
-                # If not found in index, try legacy format
-                legacy_key = get_user_journal_entry_key_legacy(user_id, entry_date) 
-                print(f"🔍 LEGACY: Trying legacy key: {legacy_key}")
-                
-                try:
-                    entry_data = db.storage.json.get(legacy_key)
-                    if isinstance(entry_data, dict) and entry_data.get('user_id') == user_id:
-                        entry = JournalEntry(**entry_data)
-                        return JournalResponse(
-                            success=True,
-                            entry=entry,
-                            message="Journal entry retrieved successfully (legacy format)"
-                        )
-                except FileNotFoundError:
-                    pass
-                
-                # Not found in either location
-                raise HTTPException(status_code=404, detail="Journal entry not found")
-                
-            except Exception as index_error:
-                print(f"Error checking journal index: {index_error}")
-                raise HTTPException(status_code=404, detail="Journal entry not found")
+
+        doc = _journal_col(user_id).document(entry_date).get()
+        if not doc.exists:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+        entry_data = doc.to_dict()
+        if entry_data.get('user_id') != user_id:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+        entry = JournalEntry(**entry_data)
+        return JournalResponse(
+            success=True,
+            entry=entry,
+            message="Journal entry retrieved successfully"
+        )
                 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting journal entry: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get journal entry")
 
 @router.put("/entries/{entry_date}", response_model=JournalResponse)
@@ -531,59 +398,36 @@ async def update_journal_entry(entry_date: str, request: UpdateJournalEntryReque
     """Update an existing journal entry"""
     try:
         user_id = user.sub
-        
+
         if not is_valid_date(entry_date):
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        journal_key = get_user_journal_entry_key(user_id, entry_date)
-        
-        try:
-            entry_data = db.storage.json.get(journal_key)
-            
-            # Ensure user_id matches for security
-            if entry_data.get('user_id') != user_id:
-                raise HTTPException(status_code=404, detail="Journal entry not found")
-            
-        except FileNotFoundError:
+
+        doc_ref = _journal_col(user_id).document(entry_date)
+        doc = doc_ref.get()
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Journal entry not found")
-        
-        # Update entry data
-        entry_data['updated_at'] = datetime.now().isoformat()
-        
+
+        entry_data = doc.to_dict()
+        if entry_data.get('user_id') != user_id:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
         # Update only provided fields
-        if request.mood is not None:
-            entry_data['mood'] = request.mood
-        if request.energy_level is not None:
-            entry_data['energy_level'] = request.energy_level
-        if request.market_outlook is not None:
-            entry_data['market_outlook'] = request.market_outlook
-        if request.pre_market_notes is not None:
-            entry_data['pre_market_notes'] = request.pre_market_notes
-        if request.post_market_notes is not None:
-            entry_data['post_market_notes'] = request.post_market_notes
-        if request.post_market_mood is not None:
-            entry_data['post_market_mood'] = request.post_market_mood
-        if request.lessons_learned is not None:
-            entry_data['lessons_learned'] = request.lessons_learned
-        if request.goals is not None:
-            entry_data['goals'] = request.goals
-        if request.daily_intentions is not None:
-            entry_data['daily_intentions'] = request.daily_intentions
-        if request.challenges is not None:
-            entry_data['challenges'] = request.challenges
-        if request.wins is not None:
-            entry_data['wins'] = request.wins
-        if request.habits is not None:
-            entry_data['habits'] = [habit.dict() for habit in request.habits]
-        
-        entry_data['updated_at'] = datetime.now().isoformat()
-        
-        # Save updated entry
-        db.storage.json.put(journal_key, entry_data)
-        
-        # NEW: Update batch storage for faster future reads
-        update_batch_storage(user_id, entry_data, remove=False)
-        
+        updates = {"updated_at": datetime.now().isoformat()}
+        if request.mood is not None: updates["mood"] = request.mood
+        if request.energy_level is not None: updates["energy_level"] = request.energy_level
+        if request.market_outlook is not None: updates["market_outlook"] = request.market_outlook
+        if request.pre_market_notes is not None: updates["pre_market_notes"] = request.pre_market_notes
+        if request.post_market_notes is not None: updates["post_market_notes"] = request.post_market_notes
+        if request.post_market_mood is not None: updates["post_market_mood"] = request.post_market_mood
+        if request.lessons_learned is not None: updates["lessons_learned"] = request.lessons_learned
+        if request.goals is not None: updates["goals"] = request.goals
+        if request.daily_intentions is not None: updates["daily_intentions"] = request.daily_intentions
+        if request.challenges is not None: updates["challenges"] = request.challenges
+        if request.wins is not None: updates["wins"] = request.wins
+        if request.habits is not None: updates["habits"] = [h.dict() for h in request.habits]
+
+        doc_ref.update(updates)
+        entry_data.update(updates)
         updated_entry = JournalEntry(**entry_data)
         
         return JournalResponse(
@@ -595,7 +439,7 @@ async def update_journal_entry(entry_date: str, request: UpdateJournalEntryReque
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error updating journal entry: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to update journal entry")
 
 @router.delete("/entries/{entry_date}")
@@ -603,34 +447,25 @@ async def delete_journal_entry(entry_date: str, user: AuthorizedUser):
     """Delete a journal entry"""
     try:
         user_id = user.sub
-        
+
         if not is_valid_date(entry_date):
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        journal_key = get_user_journal_entry_key(user_id, entry_date)
-        
-        try:
-            entry_data = db.storage.json.get(journal_key)
-            
-            # Ensure user_id matches for security
-            if entry_data.get('user_id') != user_id:
-                raise HTTPException(status_code=404, detail="Journal entry not found")
-            
-        except FileNotFoundError:
+
+        doc_ref = _journal_col(user_id).document(entry_date)
+        doc = doc_ref.get()
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Journal entry not found")
-        
-        # Delete the entry by storing empty dict
-        db.storage.json.put(journal_key, {})
-        
-        # Update journal index
-        update_journal_index(user_id, entry_date, remove=True)
-        
+
+        if doc.to_dict().get('user_id') != user_id:
+            raise HTTPException(status_code=404, detail="Journal entry not found")
+
+        doc_ref.delete()
         return {"success": True, "message": "Journal entry deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting journal entry: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to delete journal entry")
 
 # ============================================================================
@@ -651,7 +486,7 @@ async def get_habit_definitions(user: AuthorizedUser):
         )
         
     except Exception as e:
-        print(f"Error getting habit definitions: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get habit definitions")
 
 @router.post("/habits", response_model=HabitResponse)
@@ -659,29 +494,18 @@ async def create_habit_definition(request: CreateHabitRequest, user: AuthorizedU
     """Create a new habit definition"""
     try:
         user_id = user.sub
-        
-        # Validate input
+
         if not request.name.strip():
             raise HTTPException(status_code=400, detail="Habit name cannot be empty")
-        
+
         if request.category not in ["pre-market", "during-trading", "post-market"]:
             raise HTTPException(status_code=400, detail="Invalid category")
-        
-        # Load existing habits
-        habits_key = get_user_habits_key(user_id)
-        try:
-            habits_data = db.storage.json.get(habits_key, default=[])
-        except Exception:
-            habits_data = []
-        
-        # Check for duplicates
-        for habit_data in habits_data:
-            if (habit_data.get('name', '').strip().lower() == request.name.strip().lower() and 
-                habit_data.get('category') == request.category and 
-                habit_data.get('is_active', True)):
-                raise HTTPException(status_code=400, detail="Habit with this name and category already exists")
-        
-        # Create new habit definition
+
+        # Check for duplicates in Firestore
+        existing = _habits_col(user_id).where("name", "==", request.name.strip()).where("category", "==", request.category).where("is_active", "==", True).limit(1).get()
+        if existing:
+            raise HTTPException(status_code=400, detail="Habit with this name and category already exists")
+
         new_habit = HabitDefinition(
             id=str(uuid.uuid4()),
             name=request.name.strip(),
@@ -690,10 +514,8 @@ async def create_habit_definition(request: CreateHabitRequest, user: AuthorizedU
             created_at=datetime.now().isoformat(),
             is_active=True
         )
-        
-        # Add to habits list
-        habits_data.append(new_habit.dict())
-        db.storage.json.put(habits_key, habits_data)
+
+        _habits_col(user_id).document(new_habit.id).set(new_habit.dict())
         
         return HabitResponse(
             success=True,
@@ -704,7 +526,7 @@ async def create_habit_definition(request: CreateHabitRequest, user: AuthorizedU
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error creating habit definition: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to create habit definition")
 
 @router.put("/habits/{habit_id}", response_model=HabitResponse)
@@ -712,42 +534,23 @@ async def update_habit_definition(habit_id: str, request: UpdateHabitRequest, us
     """Update an existing habit definition"""
     try:
         user_id = user.sub
-        
-        # Load existing habits
-        habits_key = get_user_habits_key(user_id)
-        try:
-            habits_data = db.storage.json.get(habits_key, default=[])
-        except Exception:
-            habits_data = []
-        
-        # Find and update habit
-        habit_found = False
-        updated_habit = None
-        
-        for habit_data in habits_data:
-            if habit_data.get('id') == habit_id:
-                habit_found = True
-                
-                # Update fields if provided
-                if request.name is not None:
-                    habit_data['name'] = request.name.strip()
-                if request.category is not None:
-                    if request.category not in ["pre-market", "during-trading", "post-market"]:
-                        raise HTTPException(status_code=400, detail="Invalid category")
-                    habit_data['category'] = request.category
-                if request.description is not None:
-                    habit_data['description'] = request.description
-                if request.is_active is not None:
-                    habit_data['is_active'] = request.is_active
-                
-                updated_habit = HabitDefinition(**habit_data)
-                break
-        
-        if not habit_found:
+
+        doc_ref = _habits_col(user_id).document(habit_id)
+        doc = doc_ref.get()
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Habit definition not found")
-        
-        # Save updated habits
-        db.storage.json.put(habits_key, habits_data)
+
+        updates = {}
+        if request.name is not None: updates["name"] = request.name.strip()
+        if request.category is not None:
+            if request.category not in ["pre-market", "during-trading", "post-market"]:
+                raise HTTPException(status_code=400, detail="Invalid category")
+            updates["category"] = request.category
+        if request.description is not None: updates["description"] = request.description
+        if request.is_active is not None: updates["is_active"] = request.is_active
+
+        doc_ref.update(updates)
+        updated_habit = HabitDefinition(**{**doc.to_dict(), **updates})
         
         return HabitResponse(
             success=True,
@@ -758,7 +561,7 @@ async def update_habit_definition(habit_id: str, request: UpdateHabitRequest, us
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error updating habit definition: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to update habit definition")
 
 @router.delete("/habits/{habit_id}")
@@ -766,35 +569,19 @@ async def delete_habit_definition(habit_id: str, user: AuthorizedUser):
     """Soft delete a habit definition (mark as inactive)"""
     try:
         user_id = user.sub
-        
-        # Load existing habits
-        habits_key = get_user_habits_key(user_id)
-        try:
-            habits_data = db.storage.json.get(habits_key, default=[])
-        except Exception:
-            habits_data = []
-        
-        # Find and soft delete habit
-        habit_found = False
-        
-        for habit_data in habits_data:
-            if habit_data.get('id') == habit_id:
-                habit_found = True
-                habit_data['is_active'] = False
-                break
-        
-        if not habit_found:
+
+        doc_ref = _habits_col(user_id).document(habit_id)
+        if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Habit definition not found")
-        
-        # Save updated habits
-        db.storage.json.put(habits_key, habits_data)
+
+        doc_ref.update({"is_active": False})
         
         return {"success": True, "message": "Habit definition deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting habit definition: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to delete habit definition")
 
 # ============================================================================
@@ -806,16 +593,10 @@ async def get_mood_definitions(user: AuthorizedUser):
     """Get all mood definitions for the user"""
     try:
         user_id = user.sub
-        mood_definitions = db.storage.json.get(f"mood_definitions_{user_id}", default=[])
-        
-        return MoodResponse(
-            success=True,
-            moods=mood_definitions,
-            message=f"Retrieved {len(mood_definitions)} mood definitions"
-        )
-        
-    except Exception as e:
-        print(f"Error getting mood definitions: {e}")
+        docs = _moods_col(user_id).stream()
+        moods = [MoodDefinition(**doc.to_dict()) for doc in docs]
+        return MoodResponse(success=True, moods=moods, message=f"Retrieved {len(moods)} mood definitions")
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to get mood definitions")
 
 @router.post("/moods", response_model=MoodResponse)
@@ -823,29 +604,17 @@ async def create_mood_definition(request: CreateCustomMoodRequest, user: Authori
     """Create a new mood definition"""
     try:
         user_id = user.sub
-        
-        # Validate input
+
         if not request.name.strip():
             raise HTTPException(status_code=400, detail="Mood name cannot be empty")
-        
         if request.category not in ["positive", "negative", "neutral", "custom"]:
             raise HTTPException(status_code=400, detail="Invalid category")
-        
-        # Load existing moods
-        moods_key = f"mood_definitions_{user_id}"
-        try:
-            moods_data = db.storage.json.get(moods_key, default=[])
-        except Exception:
-            moods_data = []
-        
+
         # Check for duplicates
-        for mood_data in moods_data:
-            if (mood_data.get('name', '').strip().lower() == request.name.strip().lower() and 
-                mood_data.get('category') == request.category and 
-                mood_data.get('is_active', True)):
-                raise HTTPException(status_code=400, detail="Mood with this name and category already exists")
-        
-        # Create new mood definition
+        existing = _moods_col(user_id).where("name", "==", request.name.strip()).where("category", "==", request.category).limit(1).get()
+        if existing:
+            raise HTTPException(status_code=400, detail="Mood with this name and category already exists")
+
         new_mood = MoodDefinition(
             id=str(uuid.uuid4()),
             name=request.name.strip(),
@@ -856,21 +625,11 @@ async def create_mood_definition(request: CreateCustomMoodRequest, user: Authori
             created_at=datetime.now().isoformat(),
             user_id=user_id
         )
-        
-        # Add to moods list
-        moods_data.append(new_mood.dict())
-        db.storage.json.put(moods_key, moods_data)
-        
-        return MoodResponse(
-            success=True,
-            moods=[new_mood],
-            message="Mood definition created successfully"
-        )
-        
+        _moods_col(user_id).document(new_mood.id).set(new_mood.dict())
+        return MoodResponse(success=True, moods=[new_mood], message="Mood definition created successfully")
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"Error creating mood definition: {e}")
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to create mood definition")
 
 @router.put("/moods/{mood_id}", response_model=MoodResponse)
@@ -878,55 +637,28 @@ async def update_mood_definition(mood_id: str, request: UpdateCustomMoodRequest,
     """Update an existing mood definition"""
     try:
         user_id = user.sub
-        
-        # Load existing moods
-        moods_key = f"mood_definitions_{user_id}"
-        try:
-            moods_data = db.storage.json.get(moods_key, default=[])
-        except Exception:
-            moods_data = []
-        
-        # Find and update mood
-        mood_found = False
-        updated_mood = None
-        
-        for mood_data in moods_data:
-            if mood_data.get('id') == mood_id:
-                mood_found = True
-                
-                # Update fields if provided
-                if request.name is not None:
-                    mood_data['name'] = request.name.strip()
-                if request.category is not None:
-                    if request.category not in ["positive", "negative", "neutral", "custom"]:
-                        raise HTTPException(status_code=400, detail="Invalid category")
-                    mood_data['category'] = request.category
-                if request.color is not None:
-                    mood_data['color'] = request.color
-                if request.icon is not None:
-                    mood_data['icon'] = request.icon
-                if request.is_active is not None:
-                    mood_data['is_active'] = request.is_active
-                
-                updated_mood = MoodDefinition(**mood_data)
-                break
-        
-        if not mood_found:
+
+        doc_ref = _moods_col(user_id).document(mood_id)
+        doc = doc_ref.get()
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Mood definition not found")
-        
-        # Save updated moods
-        db.storage.json.put(moods_key, moods_data)
-        
-        return MoodResponse(
-            success=True,
-            moods=[updated_mood],
-            message="Mood definition updated successfully"
-        )
-        
+
+        updates = {}
+        if request.name is not None: updates["name"] = request.name.strip()
+        if request.category is not None:
+            if request.category not in ["positive", "negative", "neutral", "custom"]:
+                raise HTTPException(status_code=400, detail="Invalid category")
+            updates["category"] = request.category
+        if request.color is not None: updates["color"] = request.color
+        if request.icon is not None: updates["icon"] = request.icon
+        if request.is_active is not None: updates["is_active"] = request.is_active
+
+        doc_ref.update(updates)
+        updated_mood = MoodDefinition(**{**doc.to_dict(), **updates})
+        return MoodResponse(success=True, moods=[updated_mood], message="Mood definition updated successfully")
     except HTTPException:
         raise
-    except Exception as e:
-        print(f"Error updating mood definition: {e}")
+    except Exception:
         raise HTTPException(status_code=500, detail="Failed to update mood definition")
 
 @router.delete("/moods/{mood_id}")
@@ -934,35 +666,16 @@ async def delete_mood_definition(mood_id: str, user: AuthorizedUser):
     """Soft delete a mood definition (mark as inactive)"""
     try:
         user_id = user.sub
-        
-        # Load existing moods
-        moods_key = f"mood_definitions_{user_id}"
-        try:
-            moods_data = db.storage.json.get(moods_key, default=[])
-        except Exception:
-            moods_data = []
-        
-        # Find and soft delete mood
-        mood_found = False
-        
-        for mood_data in moods_data:
-            if mood_data.get('id') == mood_id:
-                mood_found = True
-                mood_data['is_active'] = False
-                break
-        
-        if not mood_found:
+        doc_ref = _moods_col(user_id).document(mood_id)
+        if not doc_ref.get().exists:
             raise HTTPException(status_code=404, detail="Mood definition not found")
-        
-        # Save updated moods
-        db.storage.json.put(moods_key, moods_data)
-        
+        doc_ref.update({"is_active": False})
         return {"success": True, "message": "Mood definition deleted successfully"}
         
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting mood definition: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to delete mood definition")
 
 # ============================================================================
@@ -1079,95 +792,11 @@ def calculate_habit_category_streak(entries: List[Dict], category: str, today: d
     )
 
 def load_user_journal_entries_secure(user_id: str) -> List[Dict]:
-    """Load journal entries for a specific user only - secure data access - OPTIMIZED VERSION"""
+    """Load all journal entries for a user from Firestore"""
     try:
-        # NEW: Use batch storage pattern for faster loading
-        batch_key = f"journal_entries_batch_{user_id}"
-        
-        # Try to get all entries in one storage call
-        try:
-            batch_entries = db.storage.json.get(batch_key, default=[])
-            if batch_entries and isinstance(batch_entries, list):
-                print(f"✅ FAST LOAD: Retrieved {len(batch_entries)} entries in single batch call")
-                return batch_entries
-        except Exception as e:
-            print(f"Warning: Batch storage read failed: {e}")
-        
-        # FALLBACK: If batch doesn't exist, try legacy individual approach but only ONCE
-        print(f"📦 MIGRATION: No batch found, migrating individual entries to batch storage...")
-        
-        # First try to get the journal index
-        journal_key = get_user_journal_key(user_id)
-        journal_entries = db.storage.json.get(journal_key, default={})
-        
-        entries = []
-        
-        # If we have an index (dictionary of dates), use it for migration
-        if isinstance(journal_entries, dict) and journal_entries:
-            print(f"📦 MIGRATION: Found index with {len(journal_entries)} dates")
-            for date_str in journal_entries.keys():
-                entry_key = get_user_journal_entry_key(user_id, date_str)
-                try:
-                    entry_data = db.storage.json.get(entry_key)
-                    if entry_data.get('user_id') == user_id:  # Extra security check
-                        entries.append(entry_data)
-                except Exception as e:
-                    print(f"Could not load journal entry for {date_str}: {e}")
-                    continue
-        else:
-            # If no index exists, do ONE final scan to migrate existing data
-            print(f"📦 MIGRATION: No journal index found, doing final migration scan...")
-            
-            # Scan for entries in the last 30 days (one-time migration)
-            from datetime import datetime, timedelta
-            end_date = datetime.now().date()
-            start_date = end_date - timedelta(days=30)
-            current_date = start_date
-            
-            found_dates = []
-            
-            while current_date <= end_date:
-                date_str = current_date.strftime('%Y-%m-%d')
-                
-                # Try new format first
-                entry_key = get_user_journal_entry_key(user_id, date_str)
-                
-                try:
-                    entry_data = db.storage.json.get(entry_key)
-                    if entry_data and entry_data.get('user_id') == user_id:
-                        entries.append(entry_data)
-                        found_dates.append(date_str)
-                except FileNotFoundError:
-                    # Try legacy format if new format doesn't exist
-                    try:
-                        legacy_key = get_user_journal_entry_key_legacy(user_id, date_str)
-                        entry_data = db.storage.json.get(legacy_key)
-                        if entry_data and entry_data.get('user_id') == user_id:
-                            entries.append(entry_data)
-                            found_dates.append(date_str)
-                            print(f"Found legacy journal entry for {date_str}")
-                    except FileNotFoundError:
-                        pass  # No entry for this date in either format
-                    except Exception as e:
-                        print(f"Error checking legacy entry for {date_str}: {e}")
-                except Exception as e:
-                    print(f"Error checking entry for {date_str}: {e}")
-                    
-                current_date += timedelta(days=1)
-            
-            print(f"📦 MIGRATION: Found {len(found_dates)} entries during migration scan")
-        
-        # NEW: Store entries in batch format for future fast access
-        if entries:
-            try:
-                db.storage.json.put(batch_key, entries)
-                print(f"📦 MIGRATION: Migrated {len(entries)} entries to batch storage")
-            except Exception as e:
-                print(f"Warning: Failed to save batch storage: {e}")
-        
-        return entries
-    except Exception as e:
-        print(f"Error loading journal entries for user {user_id}: {e}")
+        docs = _journal_col(user_id).order_by("date", direction=firestore.Query.DESCENDING).stream()
+        return [doc.to_dict() for doc in docs]
+    except Exception:
         return []
 
 @router.get("/streaks", response_model=StreakResponse)
@@ -1243,7 +872,7 @@ async def get_streak_data(user: AuthorizedUser, days: int = 90):
         )
         
     except Exception as e:
-        print(f"Error getting streak data: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get streak data")
 
 # ============================================================================
@@ -1329,7 +958,7 @@ async def get_behavioral_insights(user: AuthorizedUser, days: int = 30):
         if habit_definitions_response.success:
             active_habit_names = {habit.name for habit in habit_definitions_response.habits if habit.is_active}
         
-        print(f"Active habits for insights: {active_habit_names}")
+        pass
 
         # Load recent journal entries
         recent_entries = []
@@ -1347,7 +976,7 @@ async def get_behavioral_insights(user: AuthorizedUser, days: int = 30):
                 filtered_entry['habits'] = filtered_habits
             recent_entries.append(filtered_entry)
         
-        print(f"Filtered {len(recent_entries)} entries to only include active habits")
+        pass
 
         # Load habit analytics for comprehensive insights
         habit_analytics = calculate_comprehensive_habit_analytics(recent_entries)
@@ -1379,7 +1008,7 @@ async def get_behavioral_insights(user: AuthorizedUser, days: int = 30):
         )
         
     except Exception as e:
-        print(f"Error getting behavioral insights: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get behavioral insights")
 
 # ============================================================================
@@ -1516,7 +1145,7 @@ async def get_journal_analytics(user: AuthorizedUser, days: int = 30):
         )
         
     except Exception as e:
-        print(f"Error getting journal analytics: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get journal analytics")
 
 # ============================================================================
@@ -1528,33 +1157,23 @@ async def migrate_habits_from_journals(user: AuthorizedUser):
     """One-time migration to extract habit definitions from existing journal entries"""
     try:
         user_id = user.sub
-        habits_key = get_user_habits_key(user_id)
-        
-        # Check if habits already exist
-        try:
-            existing_habits = db.storage.json.get(habits_key, default=[])
-            if existing_habits:
-                return {"success": True, "message": "Habits already migrated"}
-        except Exception:
-            pass
-        
-        # Get all journal entries for this user
+
+        # Check if habits already exist in Firestore
+        existing = list(_habits_col(user_id).limit(1).stream())
+        if existing:
+            return {"success": True, "message": "Habits already migrated"}
+
         journal_entries = load_user_journal_entries_secure(user_id)
-        
-        # Extract unique habits from all journal entries
         unique_habits = set()
-        
         for entry in journal_entries:
-            habits = entry.get('habits', [])
-            for habit in habits:
-                habit_name = habit.get('name', '')
-                habit_category = habit.get('category', 'pre-market')
-                
-                if habit_name and habit_category:
-                    unique_habits.add((habit_name, habit_category))
-        
-        # Create habit definitions
-        migrated_habits = []
+            for habit in entry.get('habits', []):
+                name = habit.get('name', '')
+                category = habit.get('category', 'pre-market')
+                if name and category:
+                    unique_habits.add((name, category))
+
+        batch = _db().batch()
+        count = 0
         for habit_name, habit_category in unique_habits:
             habit_def = HabitDefinition(
                 id=str(uuid.uuid4()),
@@ -1563,19 +1182,17 @@ async def migrate_habits_from_journals(user: AuthorizedUser):
                 created_at="migrated_from_journals",
                 is_active=True
             )
-            migrated_habits.append(habit_def.dict())
-        
-        # Save migrated habits
-        if migrated_habits:
-            db.storage.json.put(habits_key, migrated_habits)
-        
-        return {
-            "success": True, 
-            "message": f"Migrated {len(migrated_habits)} habits from journal entries"
-        }
+            doc_ref = _habits_col(user_id).document(habit_def.id)
+            batch.set(doc_ref, habit_def.dict())
+            count += 1
+
+        if count:
+            batch.commit()
+
+        return {"success": True, "message": f"Migrated {count} habits from journal entries"}
         
     except Exception as e:
-        print(f"Error migrating habits from journals: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to migrate habits")
 
 # ============================================================================
@@ -1756,26 +1373,18 @@ async def save_journal_entry(request: CreateJournalEntryRequest, user: Authorize
     """Unified save endpoint - creates new entry or updates existing one (upsert pattern)"""
     try:
         user_id = user.sub
-        print(f"💾 UPSERT: Starting save for user {user_id}, date {request.date}")
-        
+
         if not is_valid_date(request.date):
             raise HTTPException(status_code=400, detail="Invalid date format. Use YYYY-MM-DD")
-        
-        journal_key = get_user_journal_entry_key(user_id, request.date)
+
+        doc_ref = _journal_col(user_id).document(request.date)
+        existing_doc = doc_ref.get()
         current_time = datetime.now().isoformat()
-        
-        # Check if entry already exists
-        existing_entry = None
-        try:
-            existing_entry = db.storage.json.get(journal_key)
-            print(f"💾 UPSERT: Found existing entry for {request.date}")
-        except FileNotFoundError:
-            print(f"💾 UPSERT: No existing entry for {request.date}, will create new")
-            pass
-        
+        existing_entry = existing_doc.to_dict() if existing_doc.exists else None
+
         if existing_entry:
             # UPDATE MODE: Merge with existing data
-            print(f"💾 UPSERT: Updating existing entry")
+            pass
             
             # Ensure user_id matches for security
             if existing_entry.get('user_id') != user_id:
@@ -1825,7 +1434,7 @@ async def save_journal_entry(request: CreateJournalEntryRequest, user: Authorize
             
         else:
             # CREATE MODE: Create new entry
-            print(f"💾 UPSERT: Creating new entry")
+            pass
             
             # If no habits provided, use user's habit definitions
             habits = request.habits
@@ -1858,18 +1467,9 @@ async def save_journal_entry(request: CreateJournalEntryRequest, user: Authorize
             
             operation = "created"
         
-        # Atomic save operation
-        db.storage.json.put(journal_key, entry_data)
-        print(f"✅ UPSERT: Successfully {operation} journal entry at key: {journal_key}")
-        
-        # Update journal index for new entries
-        if not existing_entry:
-            update_journal_index(user_id, request.date, remove=False)
-        
-        # NEW: Update batch storage for faster future reads
-        update_batch_storage(user_id, entry_data, remove=False)
-        
-        # Convert to JournalEntry object for response
+        # Upsert to Firestore
+        doc_ref.set(entry_data)
+
         journal_entry = JournalEntry(**entry_data)
         
         return JournalResponse(
@@ -1881,7 +1481,7 @@ async def save_journal_entry(request: CreateJournalEntryRequest, user: Authorize
     except HTTPException:
         raise
     except Exception as e:
-        print(f"❌ UPSERT: Error saving journal entry: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to save journal entry")
 
 # ============================================================================

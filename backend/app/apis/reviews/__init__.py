@@ -217,7 +217,7 @@ def get_comprehensive_data(user_id: str, days_back: int) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Error getting comprehensive data: {e}")
+        pass
         return {"trading": {}, "habits": {}, "journal": {}, "raw_data": {}, "period_days": days_back}
 
 def create_review_prompt(data: Dict[str, Any], review_type: str, focus_areas: List[str] = None) -> str:
@@ -375,7 +375,7 @@ def calculate_performance_grade(trading_metrics: Dict, journal_metrics: Dict, ha
             return "F"
             
     except Exception as e:
-        print(f"Error calculating grade: {e}")
+        pass
         return "C"
 
 # ============================================================================
@@ -405,7 +405,7 @@ async def generate_comprehensive_review(request: ReviewRequest, user: Authorized
     user_id = user.sub
     
     try:
-        print(f"📊 Generating {request.review_type} review for user {user_id}")
+        pass
         
         # Determine time period
         if request.time_period:
@@ -559,7 +559,7 @@ async def generate_comprehensive_review(request: ReviewRequest, user: Authorized
         
         confidence_score = 0.8 if trading_data.get('total_trades', 0) > 10 else 0.6
         
-        print(f"✅ Generated comprehensive {request.review_type} review for user {user_id}")
+        pass
         
         return ReviewResponse(
             review_period=f"{days_back} days ({request.review_type})",
@@ -586,7 +586,7 @@ async def generate_comprehensive_review(request: ReviewRequest, user: Authorized
         )
         
     except Exception as e:
-        print(f"❌ Error generating review: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error generating review: {str(e)}")
 
 @router.post("/weekly")
@@ -595,7 +595,7 @@ async def generate_weekly_review(request: WeeklyReviewRequest, user: AuthorizedU
     user_id = user.sub
     
     try:
-        print(f"🗺 Generating weekly review for user {user_id}")
+        pass
         
         # Get week's data
         data = get_comprehensive_data(user_id, 7)
@@ -660,7 +660,7 @@ async def generate_weekly_review(request: WeeklyReviewRequest, user: AuthorizedU
         )
         
     except Exception as e:
-        print(f"❌ Error generating weekly review: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error generating weekly review: {str(e)}")
 
 @router.post("/monthly")
@@ -669,7 +669,7 @@ async def generate_monthly_review(request: MonthlyReviewRequest, user: Authorize
     user_id = user.sub
     
     try:
-        print(f"🗺 Generating monthly review for user {user_id}")
+        pass
         
         # Get month's data
         data = get_comprehensive_data(user_id, 30)
@@ -737,7 +737,7 @@ async def generate_monthly_review(request: MonthlyReviewRequest, user: Authorize
         )
         
     except Exception as e:
-        print(f"❌ Error generating monthly review: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Error generating monthly review: {str(e)}")
 
-print("📊 Consolidated Reviews API loaded successfully")
+pass

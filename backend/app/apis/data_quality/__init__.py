@@ -366,7 +366,7 @@ class DataQualityAnalyzer:
             grouping_result = self.grouping_engine.group_trades(trades_df, strategies)
             return grouping_result.ungrouped_trades
         except Exception as e:
-            print(f"Error identifying unmatched trades: {e}")
+            pass
             return []
     
     def _calculate_quality_score(self, total_trades: int, issues: List[DataQualityIssue]) -> float:
@@ -494,7 +494,7 @@ async def assess_data_quality(user: AuthorizedUser):
         return assessment
         
     except Exception as e:
-        print(f"Error assessing data quality: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to assess data quality: {str(e)}")
 
 @router.get("/issues/{issue_id}")
@@ -522,7 +522,7 @@ async def auto_resolve_issues(issue_ids: List[str], user: AuthorizedUser):
             try:
                 # Implement auto-resolution logic here
                 # For now, just simulate resolution
-                print(f"Auto-resolving issue: {issue_id}")
+                pass
                 resolved_count += 1
             except Exception as e:
                 failed_resolutions.append({"issue_id": issue_id, "error": str(e)})

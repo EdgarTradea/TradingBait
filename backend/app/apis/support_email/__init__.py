@@ -28,7 +28,7 @@ class SupportEmailResponse(BaseModel):
 async def send_support_email(request: SupportEmailRequest):
     """Send support email from user to support team"""
     try:
-        print(f"Sending support email from: {request.user_email} - Subject: {request.subject}")
+        pass
         
         # Get SMTP configuration from secrets
         smtp_host = os.environ.get("SMTP_HOST")
@@ -132,7 +132,7 @@ async def send_support_email(request: SupportEmailRequest):
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, ["support@tradingbait.com"], msg.as_string())
         
-        print(f"Support email sent successfully from {request.user_email}")
+        pass
         
         return SupportEmailResponse(
             success=True,
@@ -140,7 +140,7 @@ async def send_support_email(request: SupportEmailRequest):
         )
         
     except Exception as e:
-        print(f"Error sending support email: {str(e)}")
+        pass
         raise HTTPException(
             status_code=500, 
             detail=f"Failed to send support email: {str(e)}"

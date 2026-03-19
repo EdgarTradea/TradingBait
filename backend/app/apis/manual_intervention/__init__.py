@@ -139,7 +139,7 @@ def create_audit_log(action_type: str, user_id: str, affected_trades: List[str],
                     changes: Dict[str, Any], reason: str, notes: Optional[str] = None) -> str:
     """Create audit log entry and return audit ID"""
     audit_id = str(uuid.uuid4())
-    
+
     audit_entry = AuditLogEntry(
         action_id=audit_id,
         action_type=action_type,
@@ -150,18 +150,14 @@ def create_audit_log(action_type: str, user_id: str, affected_trades: List[str],
         reason=reason,
         user_notes=notes
     )
-    
-    # Store audit log
+
     try:
-        import databutton as db
-        audit_key = sanitize_storage_key(f"audit_log_{user_id}")
-        existing_logs = db.storage.json.get(audit_key, default=[])
-        existing_logs.append(audit_entry.dict())
-        db.storage.json.put(audit_key, existing_logs)
-        print(f"📝 Audit log created: {audit_id} for action {action_type}")
-    except Exception as e:
-        print(f"Warning: Failed to store audit log: {e}")
-    
+        from firebase_admin import firestore
+        db_firestore = firestore.client()
+        db_firestore.collection("users").document(user_id).collection("audit_log").document(audit_id).set(audit_entry.dict())
+    except Exception:
+        pass
+
     return audit_id
 
 @router.post("/edit-trade", response_model=TradeEditResponse)
@@ -232,7 +228,7 @@ async def edit_trade(request: TradeEditRequest, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error editing trade: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to edit trade: {str(e)}")
 
 @router.post("/bulk-edit", response_model=BulkEditResponse)
@@ -314,7 +310,7 @@ async def bulk_edit_trades(request: BulkEditRequest, user: AuthorizedUser):
         )
         
     except Exception as e:
-        print(f"Error in bulk edit: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to bulk edit trades: {str(e)}")
 
 @router.post("/add-trade", response_model=ManualTradeResponse)
@@ -389,7 +385,7 @@ async def add_manual_trade(request: ManualTradeEntry, user: AuthorizedUser):
         )
         
     except Exception as e:
-        print(f"Error adding manual trade: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to add trade: {str(e)}")
 
 @router.post("/delete-trades")
@@ -445,7 +441,7 @@ async def delete_trades(request: TradeDeleteRequest, user: AuthorizedUser):
         }
         
     except Exception as e:
-        print(f"Error deleting trades: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to delete trades: {str(e)}")
 
 @router.post("/resolve-conflict")
@@ -477,22 +473,18 @@ async def resolve_conflict(request: ConflictResolutionRequest, user: AuthorizedU
 async def get_audit_log(user: AuthorizedUser, limit: int = 50):
     """Get audit log for user's manual interventions"""
     try:
-        import databutton as db
+        from firebase_admin import firestore
         user_id = user.sub
-        
-        audit_key = sanitize_storage_key(f"audit_log_{user_id}")
-        audit_logs = db.storage.json.get(audit_key, default=[])
-        
-        # Sort by timestamp (newest first) and limit
-        sorted_logs = sorted(audit_logs, key=lambda x: x.get('timestamp', ''), reverse=True)
-        
+
+        docs = firestore.client().collection("users").document(user_id).collection("audit_log").order_by("timestamp", direction=firestore.Query.DESCENDING).limit(limit).stream()
+        audit_logs = [doc.to_dict() for doc in docs]
+
         return {
-            "audit_logs": sorted_logs[:limit],
+            "audit_logs": audit_logs,
             "total_entries": len(audit_logs)
         }
-        
+
     except Exception as e:
-        print(f"Error getting audit log: {e}")
         raise HTTPException(status_code=500, detail=f"Failed to get audit log: {str(e)}")
 
 @router.post("/backfill-evaluation-ids")
@@ -554,5 +546,5 @@ async def backfill_evaluation_ids(user: AuthorizedUser):
         }
         
     except Exception as e:
-        print(f"Error backfilling evaluation IDs: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to backfill evaluation IDs: {str(e)}")

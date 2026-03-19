@@ -337,17 +337,17 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
         user_type = "auth" if record["is_authenticated"] else "anon"
         
         if response_time > 3000:
-            print(f"🚨 VERY SLOW: {record['method']} {path} - {response_time:.0f}ms [{status}] ({user_type})")
+            pass
         elif response_time > 1000:
-            print(f"⚠️  SLOW: {record['method']} {path} - {response_time:.0f}ms [{status}] ({user_type})")
+            pass
         elif status >= 400:
-            print(f"❌ ERROR: {record['method']} {path} - {response_time:.0f}ms [{status}] ({user_type})")
+            pass
         else:
-            print(f"✅ {record['method']} {path} - {response_time:.0f}ms [{status}] ({user_type})")
+            pass
     
     def _log_error(self, record: Dict[str, Any]):
         """Log error with context"""
-        print(f"💥 EXCEPTION: {record['method']} {record['path']} - {record['error']} ({record['response_time_ms']:.0f}ms)")
+        pass
     
     async def _flush_if_needed(self):
         """Flush metrics buffer if needed"""
@@ -386,14 +386,14 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
             # Store session analytics
             await self._store_session_analytics(date_key, hour_key)
             
-            print(f"📊 Flushed {len(self.metrics_buffer)} traffic analytics records to storage")
+            pass
             
             # Clear buffer
             self.metrics_buffer = []
             self.last_flush = time.time()
             
         except Exception as e:
-            print(f"❌ Failed to flush traffic analytics: {e}")
+            pass
     
     async def _store_aggregated_metrics(self, date_key: str, hour_key: str):
         """Store aggregated hourly metrics"""
@@ -447,7 +447,7 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
             db.storage.json.put(aggregated_key, summary)
             
         except Exception as e:
-            print(f"❌ Failed to store aggregated metrics: {e}")
+            pass
     
     async def _store_session_analytics(self, date_key: str, hour_key: str):
         """Store session analytics data"""
@@ -482,7 +482,7 @@ class TrafficAnalyticsMiddleware(BaseHTTPMiddleware):
             db.storage.json.put(session_key, session_analytics)
             
         except Exception as e:
-            print(f"❌ Failed to store session analytics: {e}")
+            pass
     
     def get_current_stats(self) -> Dict[str, Any]:
         """Get current real-time statistics"""
@@ -613,7 +613,7 @@ def get_performance_analytics(hours: int = 24) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"❌ Error getting performance analytics: {e}")
+        pass
         return {
             "total_requests": 0,
             "successful_requests": 0,
@@ -690,7 +690,7 @@ def get_real_time_stats() -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"❌ Error getting real-time stats: {e}")
+        pass
         return {
             "current_hour_requests": 0,
             "avg_response_time": 0,

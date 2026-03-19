@@ -18,7 +18,7 @@ async def delete_all_trades(user: AuthorizedUser):
         user_id = user.sub
         db_firestore = firestore.client()
         
-        print(f"🗑️ Deleting ALL trades for user: {user_id}")
+        pass
         
         total_deleted_trades = 0
         
@@ -29,7 +29,7 @@ async def delete_all_trades(user: AuthorizedUser):
         evaluations_processed = 0
         for evaluation_doc in evaluations:
             evaluation_id = evaluation_doc.id
-            print(f"🗑️ Deleting trades in evaluation {evaluation_id}")
+            pass
             
             # Delete all trades in this evaluation
             trades_collection = db_firestore.collection(f"users/{user_id}/evaluations/{evaluation_id}/trades")
@@ -47,7 +47,7 @@ async def delete_all_trades(user: AuthorizedUser):
             
             total_deleted_trades += trades_deleted_in_evaluation
             evaluations_processed += 1
-            print(f"✅ Deleted {trades_deleted_in_evaluation} trades from evaluation {evaluation_id}")
+            pass
         
         # 2. Delete orphaned trades at the user level (if any exist)
         user_trades_ref = db_firestore.collection(f"users/{user_id}/trades")
@@ -62,7 +62,7 @@ async def delete_all_trades(user: AuthorizedUser):
         
         if orphaned_trades_deleted > 0:
             batch.commit()
-            print(f"✅ Deleted {orphaned_trades_deleted} orphaned trades at user level")
+            pass
         
         total_deleted_trades += orphaned_trades_deleted
         
@@ -75,7 +75,7 @@ async def delete_all_trades(user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting all trades: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/trades-by-account/{account_id}", response_model=DeleteResponse)
@@ -85,7 +85,7 @@ async def delete_trades_by_account(account_id: str, user: AuthorizedUser):
         user_id = user.sub
         db_firestore = firestore.client()
         
-        print(f"🗑️ Deleting trades for account ID: {account_id} (user: {user_id})")
+        pass
         
         # Find all evaluations for this account ID
         evaluations_ref = db_firestore.collection(f"users/{user_id}/evaluations")
@@ -97,7 +97,7 @@ async def delete_trades_by_account(account_id: str, user: AuthorizedUser):
         # Delete ONLY trades in each evaluation, keep the evaluations
         for evaluation_doc in evaluations:
             evaluation_id = evaluation_doc.id
-            print(f"🗑️ Deleting trades in evaluation {evaluation_id} for account {account_id}")
+            pass
             
             # Delete all trades in this evaluation
             trades_collection = db_firestore.collection(f"users/{user_id}/evaluations/{evaluation_id}/trades")
@@ -116,7 +116,7 @@ async def delete_trades_by_account(account_id: str, user: AuthorizedUser):
             
             total_deleted_trades += trades_deleted_in_evaluation
             evaluations_processed += 1
-            print(f"✅ Deleted {trades_deleted_in_evaluation} trades from evaluation {evaluation_id}")
+            pass
         
         if evaluations_processed == 0:
             return DeleteResponse(
@@ -134,7 +134,7 @@ async def delete_trades_by_account(account_id: str, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting trades by account: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.delete("/trades-by-evaluation/{evaluation_id}", response_model=DeleteResponse)
@@ -144,7 +144,7 @@ async def delete_trades_by_evaluation(evaluation_id: str, user: AuthorizedUser):
         user_id = user.sub
         db_firestore = firestore.client()
         
-        print(f"🗑️ Deleting trades for evaluation ID: {evaluation_id} (user: {user_id})")
+        pass
         
         # Check if evaluation exists
         evaluation_ref = db_firestore.collection(f"users/{user_id}/evaluations").document(evaluation_id)
@@ -171,9 +171,9 @@ async def delete_trades_by_evaluation(evaluation_id: str, user: AuthorizedUser):
         # Only commit if there are trades to delete
         if trades_deleted > 0:
             batch.commit()
-            print(f"✅ Deleted {trades_deleted} trades from evaluation {evaluation_id}")
+            pass
         else:
-            print(f"ℹ️ No trades found in evaluation {evaluation_id}")
+            pass
         
         return DeleteResponse(
             success=True,
@@ -184,5 +184,5 @@ async def delete_trades_by_evaluation(evaluation_id: str, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting trades by evaluation: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))

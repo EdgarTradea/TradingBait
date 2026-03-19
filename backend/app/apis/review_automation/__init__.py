@@ -37,7 +37,7 @@ async def should_trigger_weekly_review(user_id: str) -> bool:
         
         return days_since_review >= 7
     except Exception as e:
-        print(f"Error checking weekly review schedule: {e}")
+        pass
         return False
 
 async def should_trigger_monthly_review(user_id: str) -> bool:
@@ -54,13 +54,13 @@ async def should_trigger_monthly_review(user_id: str) -> bool:
         
         return days_since_review >= 30
     except Exception as e:
-        print(f"Error checking monthly review schedule: {e}")
+        pass
         return False
 
 async def trigger_weekly_review(user_id: str):
     """Trigger automated weekly trading review"""
     try:
-        print(f"📅 Triggering weekly review for user {user_id}")
+        pass
         
         # Import pattern analysis functions
         from app.apis.pattern_analysis import load_user_trades, analyze_trading_patterns, generate_behavioral_alerts, generate_coaching_triggers
@@ -69,7 +69,7 @@ async def trigger_weekly_review(user_id: str):
         trades = load_user_trades(user_id, 7)
         
         if not trades:
-            print("ℹ️ No trading data available for weekly review")
+            pass
             return {"status": "no_data", "message": "No trading data available for review"}
         
         # Run pattern analysis
@@ -127,10 +127,10 @@ Let's discuss your trading progress and work on areas for improvement. What woul
                     "patterns_included": len(patterns)
                 }
                 
-                print(f"✅ Weekly review conversation created: {conversation_id}")
+                pass
                 
             except Exception as e:
-                print(f"⚠️ Error creating weekly review conversation: {e}")
+                pass
         
         # Record that weekly review was completed
         last_review_key = ReviewScheduler.get_last_review_key(user_id, "weekly")
@@ -140,7 +140,7 @@ Let's discuss your trading progress and work on areas for improvement. What woul
             "coaching_triggered": bool(coaching_data)
         })
         
-        print(f"✅ Weekly review completed for {user_id}")
+        pass
         return {
             "status": "completed",
             "patterns_analyzed": len(patterns),
@@ -148,13 +148,13 @@ Let's discuss your trading progress and work on areas for improvement. What woul
         }
         
     except Exception as e:
-        print(f"❌ Error in weekly review: {e}")
+        pass
         return {"status": "error", "error": str(e)}
 
 async def trigger_monthly_review(user_id: str):
     """Trigger automated monthly trading review"""
     try:
-        print(f"📈 Triggering monthly review for user {user_id}")
+        pass
         
         # Import pattern analysis functions
         from app.apis.pattern_analysis import load_user_trades, analyze_trading_patterns, generate_behavioral_alerts, generate_coaching_triggers
@@ -163,7 +163,7 @@ async def trigger_monthly_review(user_id: str):
         trades = load_user_trades(user_id, 30)
         
         if not trades:
-            print("ℹ️ No trading data available for monthly review")
+            pass
             return {"status": "no_data", "message": "No trading data available for review"}
         
         # Run pattern analysis
@@ -237,10 +237,10 @@ This monthly review provides deeper insights into your trading evolution. Let's 
                     "performance_summary": performance_summary
                 }
                 
-                print(f"✅ Monthly review conversation created: {conversation_id}")
+                pass
                 
             except Exception as e:
-                print(f"⚠️ Error creating monthly review conversation: {e}")
+                pass
         
         # Record that monthly review was completed
         last_review_key = ReviewScheduler.get_last_review_key(user_id, "monthly")
@@ -251,7 +251,7 @@ This monthly review provides deeper insights into your trading evolution. Let's 
             "coaching_triggered": bool(coaching_data)
         })
         
-        print(f"✅ Monthly review completed for {user_id}")
+        pass
         return {
             "status": "completed",
             "patterns_analyzed": len(patterns),
@@ -260,7 +260,7 @@ This monthly review provides deeper insights into your trading evolution. Let's 
         }
         
     except Exception as e:
-        print(f"❌ Error in monthly review: {e}")
+        pass
         return {"status": "error", "error": str(e)}
 
 async def check_and_trigger_reviews(user_id: str) -> Dict[str, Any]:

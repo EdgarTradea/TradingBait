@@ -136,7 +136,7 @@ async def create_manual_trade(trade_request: ManualTradeRequest, user: Authorize
         
         # Update trial usage after successful creation
         update_trial_usage(user.sub, "trades", 1)
-        print(f"Updated trial usage: trades +1 for user {user.sub}")
+        pass
         
         # Update tag usage statistics
         if trade_request.custom_tags:
@@ -150,7 +150,7 @@ async def create_manual_trade(trade_request: ManualTradeRequest, user: Authorize
         )
         
     except Exception as e:
-        print(f"Error creating manual trade: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to create manual trade")
 
 @router.get("/tag-suggestions")
@@ -180,7 +180,7 @@ async def get_tag_suggestions(user: AuthorizedUser) -> List[TagSuggestion]:
         return suggestions[:20]
         
     except Exception as e:
-        print(f"Error getting tag suggestions: {e}")
+        pass
         return []
 
 async def update_tag_usage(user_id: str, tags: List[str]):
@@ -201,7 +201,7 @@ async def update_tag_usage(user_id: str, tags: List[str]):
         tag_stats_ref.set(current_stats)
         
     except Exception as e:
-        print(f"Error updating tag usage: {e}")
+        pass
 
 @router.put("/update/{trade_id}")
 async def update_manual_trade(trade_id: str, trade_request: ManualTradeRequest, user: AuthorizedUser) -> ManualTradeResponse:
@@ -283,7 +283,7 @@ async def update_manual_trade(trade_id: str, trade_request: ManualTradeRequest, 
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error updating manual trade: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to update manual trade")
 
 @router.delete("/delete/{trade_id}")
@@ -316,5 +316,5 @@ async def delete_manual_trade(trade_id: str, evaluation_id: str, user: Authorize
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting manual trade: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to delete manual trade")

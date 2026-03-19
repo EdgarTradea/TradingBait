@@ -70,7 +70,7 @@ def convert_trade_dict_to_tradedata(trade_dict: Dict[str, Any]) -> TradeData:
             swap=float(trade_dict.get('swap', 0))
         )
     except Exception as e:
-        print(f"Error converting trade data: {e}")
+        pass
         # Return a minimal trade object
         return TradeData(
             symbol=trade_dict.get('symbol', 'UNKNOWN'),
@@ -124,7 +124,7 @@ async def comprehensive_pattern_analysis_standalone(request: PatternAnalysisRequ
                 tomorrow_focus=entry.get('tomorrowFocus', '')
             ) for entry in journal_data]
         except Exception as e:
-            print(f"Error loading journal entries: {e}")
+            pass
             journal_entries = []
         
         # Initialize pattern recognition engine
@@ -223,7 +223,7 @@ async def comprehensive_pattern_analysis_standalone(request: PatternAnalysisRequ
         )
         
     except Exception as e:
-        print(f"Error in comprehensive pattern analysis: {e}")
+        pass
         return ComprehensivePatternResponse(
             insights=[],
             patterns_detected=[],

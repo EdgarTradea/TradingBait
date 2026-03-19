@@ -80,7 +80,7 @@ def check_stripe_connection() -> StripeConnectionResponse:
             currency=account.default_currency
         )
     except Exception as e:
-        print(f"Stripe connection failed: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Stripe connection failed: {str(e)}")
 
 @router.post("/create-product")
@@ -101,7 +101,7 @@ def create_stripe_product(request: CreateProductRequest) -> CreateProductRespons
             recurring={"interval": request.interval}
         )
         
-        print(f"Created product: {product.id} with price: {price.id}")
+        pass
         
         return CreateProductResponse(
             product_id=product.id,
@@ -112,7 +112,7 @@ def create_stripe_product(request: CreateProductRequest) -> CreateProductRespons
         )
         
     except Exception as e:
-        print(f"Failed to create Stripe product: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to create product: {str(e)}")
 
 @router.get("/products")
@@ -139,7 +139,7 @@ def list_stripe_products() -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"Failed to list Stripe products: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to list products: {str(e)}")
 
 @router.post("/create-checkout")
@@ -191,11 +191,11 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
                     discounts = [{"coupon": discount_response.stripe_coupon_id}]
                     discount_applied = True
                     discount_amount = discount_response.discount_amount
-                    print(f"Applied discount code: {request.discount_code} -> {discount_response.discount_amount}")
+                    pass
                 else:
-                    print(f"Invalid discount code: {request.discount_code} - {discount_response.message}")
+                    pass
             except Exception as e:
-                print(f"Error validating discount code: {e}")
+                pass
         
         # Fallback to referral code if no discount code was applied
         elif request.referral_code:
@@ -220,7 +220,7 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
                     discounts = [{"coupon": discount_response.stripe_coupon_id}]
                     discount_applied = True
                     discount_amount = discount_response.discount_amount
-                    print(f"Applied custom discount: {request.referral_code} -> {discount_response.discount_amount}")
+                    pass
                 else:
                     # Fall back to legacy 20% referral discount
                     coupon_id = "REFERRAL20"
@@ -230,9 +230,9 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
                         discounts = [{"coupon": coupon_id}]
                         discount_applied = True
                         discount_amount = 20.0
-                        print(f"Applied legacy referral discount: {coupon_id}")
+                        pass
                     except Exception as coupon_error:
-                        print(f"Legacy referral coupon not found: {coupon_error}")
+                        pass
                         # Create the referral coupon if it doesn't exist
                         try:
                             coupon = stripe.Coupon.create(
@@ -248,11 +248,11 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
                             discounts = [{"coupon": coupon_id}]
                             discount_applied = True
                             discount_amount = 20.0
-                            print(f"Created and applied legacy referral discount: {coupon_id}")
+                            pass
                         except Exception as create_error:
-                            print(f"Failed to create legacy referral coupon: {create_error}")
+                            pass
             except Exception as e:
-                print(f"Error with referral/discount code: {e}")
+                pass
                 # Fall back to legacy 20% referral discount
                 coupon_id = "REFERRAL20"
                 try:
@@ -262,7 +262,7 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
                     discount_applied = True
                     discount_amount = 20.0
                 except Exception as e:
-                    print(f"Failed to apply legacy referral discount: {e}")
+                    pass
                     # Create the referral coupon if it doesn't exist
                     try:
                         coupon = stripe.Coupon.create(
@@ -279,7 +279,7 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
                         discount_applied = True
                         discount_amount = 20.0
                     except Exception as e:
-                        print(f"Failed to create legacy referral coupon: {e}")
+                        pass
 
         if request.discount_code:
             # Apply the discount code
@@ -288,9 +288,9 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
                 discounts = [{"coupon": request.discount_code}]
                 discount_applied = True
                 discount_amount = coupon.percent_off
-                print(f"Applied discount code: {request.discount_code} -> {coupon.percent_off}%")
+                pass
             except Exception as e:
-                print(f"Failed to apply discount code: {e}")
+                pass
         
         # Create checkout session
         session_params = {
@@ -313,7 +313,7 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
         
         session = stripe.checkout.Session.create(**session_params)
         
-        print(f"Created checkout session: {session.id} with discount: {discount_applied}")
+        pass
         
         return CreateCheckoutResponse(
             checkout_url=session.url,
@@ -323,7 +323,7 @@ def create_stripe_checkout(request: CreateCheckoutRequest) -> CreateCheckoutResp
         )
         
     except Exception as e:
-        print(f"Failed to create Stripe checkout: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to create checkout: {str(e)}")
 
 
@@ -368,7 +368,7 @@ def create_subscription_checkout(request: CreateSubscriptionCheckoutRequest) -> 
                     discount_applied = True
                     discount_amount = discount_response.discount_amount
             except Exception as e:
-                print(f"Error validating discount code: {e}")
+                pass
 
         session_params = {
             "payment_method_types": ["card"],
@@ -399,7 +399,7 @@ def create_subscription_checkout(request: CreateSubscriptionCheckoutRequest) -> 
         )
         
     except Exception as e:
-        print(f"Failed to create subscription checkout: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to create subscription checkout: {str(e)}")
 
 
@@ -435,11 +435,11 @@ def create_trial_checkout(request: CreateTrialCheckoutRequest) -> CreateTrialChe
                     discounts = [{"coupon": discount_response.stripe_coupon_id}]
                     discount_applied = True
                     discount_amount = discount_response.discount_amount
-                    print(f"Applied discount: {request.discount_code} -> -{discount_response.discount_amount}")
+                    pass
                 else:
-                    print(f"Invalid discount code: {request.discount_code} - {discount_response.message}")
+                    pass
             except Exception as e:
-                print(f"Error validating discount code: {e}")
+                pass
 
         session_params = {
             "payment_method_types": ["card"],
@@ -461,7 +461,7 @@ def create_trial_checkout(request: CreateTrialCheckoutRequest) -> CreateTrialChe
             session_params["discounts"] = discounts
 
         session = stripe.checkout.Session.create(**session_params)
-        print(f"Created checkout session: {session.id}, price: $7.99, discount: {discount_applied}")
+        pass
 
         return CreateTrialCheckoutResponse(
             checkout_url=session.url,
@@ -471,5 +471,5 @@ def create_trial_checkout(request: CreateTrialCheckoutRequest) -> CreateTrialChe
         )
 
     except Exception as e:
-        print(f"Failed to create checkout: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to create checkout: {str(e)}")

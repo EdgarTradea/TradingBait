@@ -8,6 +8,8 @@ from app.auth import AuthorizedUser
 import databutton as db
 from typing import Optional
 import re
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 
 router = APIRouter(prefix="/user-status")
 
@@ -42,29 +44,29 @@ def check_user_status(user: AuthorizedUser, response: Response, _t: Optional[int
         user_id = user.sub
         
         # Enhanced logging for debugging Chrome-specific issues
-        print(f"=== USER STATUS CHECK DEBUG ===")
-        print(f"User email: {user_email or 'NO_EMAIL'}")
-        print(f"User ID: {user_id}")
-        print(f"User ID type: {type(user_id)}")
-        print(f"User ID length: {len(user_id) if user_id else 0}")
+        pass
+        pass
+        pass
+        pass
+        pass
         
         # CHROME DEBUGGING: Log additional auth context
-        print(f"🔍 CHROME DEBUG - Auth context details:")
-        print(f"   - User sub: {getattr(user, 'sub', 'NOT_SET')}")
-        print(f"   - User email: {getattr(user, 'email', 'NOT_SET')}")
-        print(f"   - User iss: {getattr(user, 'iss', 'NOT_SET')}")
-        print(f"   - User aud: {getattr(user, 'aud', 'NOT_SET')}")
-        print(f"   - User exp: {getattr(user, 'exp', 'NOT_SET')}")
-        print(f"   - User iat: {getattr(user, 'iat', 'NOT_SET')}")
-        print(f"   - Full user object: {user.__dict__ if hasattr(user, '__dict__') else 'No dict'}")
+        pass
+        pass
+        pass
+        pass
+        pass
+        pass
+        pass
+        pass
         
         # Check if this is Valeria specifically
         if user_email == "valeriatorresal@gmail.com" or user_id == "anEsjUyGlzMeyajIe1D9HDaABMw1":
-            print(f"🔍 VALERIA DETECTED - Enhanced debugging enabled")
-            print(f"Auth context - Sub: {user.sub}")
-            print(f"Auth context - Email: {getattr(user, 'email', 'NOT_SET')}")
+            pass
+            pass
+            pass
         
-        print(f"Checking subscription for user: {user_email or 'no-email'} (ID: {user_id})")
+        pass
         
         # Check if user is admin - grant automatic access (check this first, before email)
         admin_user_ids = [
@@ -75,7 +77,7 @@ def check_user_status(user: AuthorizedUser, response: Response, _t: Optional[int
         ]
         
         if user_id in admin_user_ids:
-            print("Admin user detected - granting automatic access")
+            pass
             user_status = UserStatusResponse(
                 has_access=True,
                 status="admin_access",
@@ -96,7 +98,7 @@ def check_user_status(user: AuthorizedUser, response: Response, _t: Optional[int
             )
         
         if not user_email:
-            print(f"❌ No email found for user ID: {user_id}")
+            pass
             user_status = UserStatusResponse(
                 has_access=False,
                 status="no_subscription",
@@ -116,21 +118,18 @@ def check_user_status(user: AuthorizedUser, response: Response, _t: Optional[int
             )
         
         # Check for active subscription
-        print(f"Building storage key for user ID: {user_id}")
-        sanitized_user_id = sanitize_storage_key(user_id.replace('.', '_').replace('@', '_at_'))
-        subscription_key = f"subscription.{sanitized_user_id}"
-        print(f"Storage key: {subscription_key}")
-        
         try:
-            print(f"Attempting to retrieve subscription data...")
-            subscription_data = db.storage.json.get(subscription_key)
+            initialize_firebase()
+            db_firestore = firestore.client()
+            user_doc = db_firestore.collection('users').document(user_id).get()
+            user_data = user_doc.to_dict() if user_doc.exists else {}
             
-            if subscription_data:
-                subscription_status = subscription_data.get("subscription_status")
-                subscription_type = subscription_data.get("subscription_type")
+            if user_doc.exists and user_data.get("subscription_status"):
+                subscription_status = user_data.get("subscription_status")
+                subscription_type = user_data.get("subscription_type", "professional")
                 
-                print(f"✅ Found subscription - Type: {subscription_type}, Status: {subscription_status}")
-                print(f"Full subscription data: {subscription_data}")
+                pass
+                pass
                 
                 # Check if subscription is active
                 if subscription_status in ["active", "trialing"]:
@@ -171,10 +170,10 @@ def check_user_status(user: AuthorizedUser, response: Response, _t: Optional[int
                         }
                     )
             else:
-                print(f"❌ No subscription data found for key: {subscription_key}")
+                pass
                 
         except Exception as storage_error:
-            print(f"❌ Error accessing subscription storage: {storage_error}")
+            pass
         
         # If no subscription found, return access denied
         user_status = UserStatusResponse(
@@ -196,7 +195,7 @@ def check_user_status(user: AuthorizedUser, response: Response, _t: Optional[int
         )
         
     except Exception as e:
-        print(f"❌ Error in check_user_status: {e}")
+        pass
         error_status = UserStatusResponse(
             has_access=False,
             status="error",

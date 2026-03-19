@@ -208,7 +208,7 @@ async def register_affiliate(
             elif status == 'rejected':
                 # Allow reapplication if previously rejected
                 affiliate_id = existing_data['affiliate_id']
-                print(f"User {user.sub} reapplying after rejection, updating existing record {affiliate_id}")
+                pass
             else:
                 raise HTTPException(status_code=400, detail="User already has an affiliate record")
         else:
@@ -248,7 +248,7 @@ async def register_affiliate(
         # Save to Firestore (use set with merge for reapplications)
         db_firestore.collection("affiliates").document(affiliate_id).set(affiliate_profile.dict(), merge=True)
         
-        print(f"Affiliate registered/updated: {affiliate_id} ({request.email})")
+        pass
         
         return AffiliateRegistrationResponse(
             success=True,
@@ -260,7 +260,7 @@ async def register_affiliate(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error registering affiliate: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to register affiliate")
 
 @router.get("/profile")
@@ -289,7 +289,7 @@ async def get_affiliate_profile(user: AuthorizedUser) -> AffiliateProfileRespons
                 ref_data = ref_doc.to_dict()
                 recent_referrals.append(ReferralRecord(**ref_data))
         except Exception as e:
-            print(f"Warning: Could not load referrals due to missing index: {e}")
+            pass
             # Continue without referrals - they're not critical for profile display
         
         # Calculate analytics for current month
@@ -314,7 +314,7 @@ async def get_affiliate_profile(user: AuthorizedUser) -> AffiliateProfileRespons
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting affiliate profile: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get affiliate profile")
 
 @router.post("/generate-link")
@@ -356,7 +356,7 @@ async def generate_referral_link(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error generating referral link: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to generate referral link")
 
 @router.get("/earnings")
@@ -404,7 +404,7 @@ async def get_affiliate_earnings(user: AuthorizedUser) -> Dict[str, Any]:
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting affiliate earnings: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get affiliate earnings")
 
 # === REFERRAL TRACKING ENDPOINT ===
@@ -427,7 +427,7 @@ async def track_referral_signup(
         ).where(filter=firestore.FieldFilter("status", "==", "approved")).get()
         
         if not affiliate_query:
-            print(f"No approved affiliate found for referral code: {referral_code}")
+            pass
             return {"success": True, "message": "Invalid or inactive referral code"}
         
         affiliate_doc = affiliate_query[0]
@@ -456,7 +456,7 @@ async def track_referral_signup(
             "updated_at": datetime.utcnow().isoformat()
         })
         
-        print(f"Tracked referral signup: {referred_email} via {referral_code}")
+        pass
         
         return {
             "success": True,
@@ -465,7 +465,7 @@ async def track_referral_signup(
         }
         
     except Exception as e:
-        print(f"Error tracking referral signup: {e}")
+        pass
         return {"success": False, "message": "Failed to track referral"}
 
 @router.post("/track-conversion")
@@ -483,7 +483,7 @@ async def track_referral_conversion(
         ).where("status", "==", "pending").get()
         
         if not referral_query:
-            print(f"No pending referral found for user: {user_id}")
+            pass
             return {"success": True, "message": "No referral to convert"}
         
         referral_doc = referral_query[0]
@@ -518,7 +518,7 @@ async def track_referral_conversion(
             "updated_at": datetime.utcnow().isoformat()
         })
         
-        print(f"Tracked referral conversion: ${payment_amount} -> ${commission_amount} commission")
+        pass
         
         return {
             "success": True,
@@ -527,5 +527,5 @@ async def track_referral_conversion(
         }
         
     except Exception as e:
-        print(f"Error tracking referral conversion: {e}")
+        pass
         return {"success": False, "message": "Failed to track conversion"}

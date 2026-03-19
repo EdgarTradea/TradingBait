@@ -111,8 +111,8 @@ async def calculate_fifo_for_trades(request: FifoCalculationRequest, user: Autho
     """Calculate FIFO P&L for trades with optional grouping"""
     
     try:
-        print(f"🧮 Starting FIFO calculation for user {user.sub}")
-        print(f"📊 Processing {len(request.trades)} trades with grouping: {request.use_grouping}")
+        pass
+        pass
         
         if not request.trades:
             return FifoCalculationResponse(
@@ -144,11 +144,11 @@ async def calculate_fifo_for_trades(request: FifoCalculationRequest, user: Autho
                 request, fifo_calculator, user
             )
         
-        print(f"✅ FIFO calculation complete: {result.total_groups} groups, {result.total_trades_processed} trades")
+        pass
         return result
         
     except Exception as e:
-        print(f"❌ Error in FIFO calculation: {e}")
+        pass
         raise HTTPException(status_code=500, detail=f"FIFO calculation failed: {str(e)}")
 
 async def _calculate_fifo_with_grouping(
@@ -191,8 +191,8 @@ async def _calculate_fifo_with_grouping(
     # Final validation - ensure all required columns are present
     missing_columns = [col for col in required_columns if col not in trades_df.columns]
     if missing_columns:
-        print(f"⚠️ Missing required columns for grouping: {missing_columns}")
-        print(f"Available columns: {list(trades_df.columns)}")
+        pass
+        pass
         # Create missing columns with default values
         for col in missing_columns:
             if col == 'symbol':
@@ -222,7 +222,7 @@ async def _calculate_fifo_with_grouping(
     grouping_engine = TradeGroupingEngine()
     grouping_result = grouping_engine.group_trades(trades_df, strategies)
     
-    print(f"🔗 Trade grouping result: {len(grouping_result.groups)} groups, {len(grouping_result.ungrouped_trades)} ungrouped")
+    pass
     
     # Calculate FIFO for each group
     group_results = []

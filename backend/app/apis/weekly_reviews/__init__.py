@@ -2,8 +2,9 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any
 from datetime import datetime, timedelta
-import databutton as db
 from app.auth import AuthorizedUser
+from firebase_admin import storage, firestore
+from app.libs.firebase_init import initialize_firebase
 import uuid
 import base64
 import re
@@ -86,29 +87,9 @@ async def create_weekly_review(
     review_id = str(uuid.uuid4())
     
     # Save review data
-    review_key = sanitize_storage_key(f"weekly_review_{user_id}_{review_id}")
-    review_storage = {
-        "review_id": review_id,
-        "user_id": user_id,
-        "start_date": review_data.start_date,
-        "end_date": review_data.end_date,
-        "trading_days": review_data.trading_days,
-        "total_trades": review_data.total_trades,
-        "good_trades": review_data.good_trades,
-        "bad_trades": review_data.bad_trades,
-        "wins": review_data.wins,
-        "losses": review_data.losses,
-        "break_even": review_data.break_even,
-        "total_pnl": review_data.total_pnl,
-        "emotional_reflection": review_data.emotional_reflection,
-        "trading_reflections": review_data.trading_reflections,
-        "execution_goals": review_data.execution_goals,
-        "habit_metrics": review_data.habit_metrics,
-        "improvement_metrics": review_data.improvement_metrics,
-        "created_at": datetime.now().isoformat()
-    }
-    
-    db.storage.json.put(review_key, review_storage)
+    initialize_firebase()
+    firestore_db = firestore.client()
+    firestore_db.collection(f"users/{user_id}/weekly_reviews").document(review_id).set(review_storage)
     
     # Save chart images
     for idx, image_base64 in enumerate(review_data.chart_images_base64):
@@ -119,10 +100,11 @@ async def create_weekly_review(
                     image_base64 = image_base64.split(',')[1]
                 
                 image_data = base64.b64decode(image_base64)
-                image_key = sanitize_storage_key(f"weekly_review_image_{review_id}_{idx}")
-                db.storage.binary.put(image_key, image_data)
+                bucket = storage.bucket()
+                blob = bucket.blob(f"weekly-review-images/{user_id}/{review_id}/{idx}")
+                blob.upload_from_string(image_data, content_type="image/png")
             except Exception as e:
-                print(f"Error saving chart image {idx}: {e}")
+                pass
     
     return WeeklyReviewResponse(**review_storage)
 
@@ -136,20 +118,18 @@ async def list_weekly_reviews(
     user_id = user.sub
     
     # List all review files for this user
-    all_files = db.storage.json.list()
-    review_files = [
-        f for f in all_files
-        if f.name.startswith(f"weekly_review_{user_id}_")
-    ]
+    initialize_firebase()
+    firestore_db = firestore.client()
+    docs = firestore_db.collection(f"users/{user_id}/weekly_reviews").stream()
     
     # Load all reviews
     reviews = []
-    for file in review_files:
+    for doc in docs:
         try:
-            review_data = db.storage.json.get(file.name)
+            review_data = doc.to_dict()
             reviews.append(WeeklyReviewResponse(**review_data))
         except Exception as e:
-            print(f"Error loading review {file.name}: {e}")
+            pass
     
     # Sort by created_at descending (newest first)
     reviews.sort(key=lambda x: x.created_at, reverse=True)
@@ -175,11 +155,14 @@ async def get_weekly_review(
     user_id = user.sub
     
     # Load review
-    review_key = sanitize_storage_key(f"weekly_review_{user_id}_{review_id}")
-    try:
-        review_data = db.storage.json.get(review_key)
-    except Exception:
+    initialize_firebase()
+    firestore_db = firestore.client()
+    doc = firestore_db.collection(f"users/{user_id}/weekly_reviews").document(review_id).get()
+    
+    if not doc.exists:
         raise HTTPException(status_code=404, detail="Weekly review not found")
+        
+    review_data = doc.to_dict()
     
     review = WeeklyReviewResponse(**review_data)
     
@@ -191,10 +174,12 @@ async def get_weekly_review(
     current_date = start_date
     while current_date <= end_date:
         date_str = current_date.strftime("%Y-%m-%d")
-        entry_key = sanitize_storage_key(f"journal_entry_{user_id}_{date_str}")
-        
         try:
-            entry = db.storage.json.get(entry_key)
+            doc = firestore_db.collection(f"users/{user_id}/journal").document(date_str).get()
+            if not doc.exists:
+                raise Exception
+                
+            entry = doc.to_dict()
             mood = entry.get("mood", "neutral")
             habits = entry.get("habits", [])
             habit_completion = (len([h for h in habits if h.get("completed", False)]) / len(habits) * 100) if habits else 0
@@ -215,18 +200,20 @@ async def get_weekly_review(
         current_date += timedelta(days=1)
     
     # Load chart images
+    bucket = storage.bucket()
+    blobs = bucket.list_blobs(prefix=f"weekly-review-images/{user_id}/{review_id}/")
+    
     chart_images = []
-    idx = 0
-    while True:
-        image_key = sanitize_storage_key(f"weekly_review_image_{review_id}_{idx}")
+    sorted_blobs = sorted(list(blobs), key=lambda b: b.name)
+    
+    for blob in sorted_blobs:
         try:
-            image_data = db.storage.binary.get(image_key)
+            image_data = blob.download_as_bytes()
             # Convert to base64 for frontend
             image_base64 = base64.b64encode(image_data).decode('utf-8')
             chart_images.append(f"data:image/png;base64,{image_base64}")
-            idx += 1
         except Exception:
-            break  # No more images
+            pass
     
     return WeeklyReviewDetailResponse(
         review=review,

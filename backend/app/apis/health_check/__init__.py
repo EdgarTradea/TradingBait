@@ -1,7 +1,9 @@
 from fastapi import APIRouter
 from pydantic import BaseModel
 from datetime import datetime
-import databutton as db
+import logging
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 
 router = APIRouter(prefix="/health")
 
@@ -18,11 +20,15 @@ def basic_health_check() -> HealthCheckResponse:
         # Simple health check - just verify the API is responding
         # Test basic db connection
         try:
-            db.storage.text.put("health_check_test", "test")
-            db.storage.text.get("health_check_test")
+            initialize_firebase()
+            firestore_db = firestore.client()
+            firestore_db.collection("system").document("health_check").set({
+                "last_ping": datetime.utcnow().isoformat(),
+                "status": "online"
+            })
+            firestore_db.collection("system").document("health_check").get()
         except Exception as e:
-            print(f"⚠️ Storage health check warning: {e}")
-            # Don't fail the health check for storage issues
+            pass
         
         return HealthCheckResponse(
             status="healthy",
@@ -31,7 +37,7 @@ def basic_health_check() -> HealthCheckResponse:
             environment="production"
         )
     except Exception as e:
-        print(f"❌ Health check failed: {e}")
+        pass
         return HealthCheckResponse(
             status="unhealthy", 
             timestamp=datetime.utcnow().isoformat(),

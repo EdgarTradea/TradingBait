@@ -21,10 +21,10 @@ def verify_admin_access(user: AuthorizedUser):
         "admin-user-id",  # Workspace admin user ID
         "admin-user"  # Current workspace user ID
     ]
-    print(f"Admin check - Current user ID: {user.sub}")
-    print(f"Admin check - User email: {getattr(user, 'email', 'unknown')}")
+    pass
+    pass
     if user.sub not in admin_user_ids:
-        print(f"Access denied - User {user.sub} is not in admin list {admin_user_ids}")
+        pass
         raise HTTPException(status_code=403, detail="Admin access required")
 
 # === DATA MODELS ===
@@ -74,11 +74,11 @@ async def get_early_access_signups(
                     if signup_data:
                         signups_data.append(EarlyAccessSignup(**signup_data))
                 except Exception as e:
-                    print(f"Error reading signup data from {key}: {str(e)}")
+                    pass
                     continue
                     
         except Exception as e:
-            print(f"Error listing early access files: {str(e)}")
+            pass
         
         # Calculate stats
         total_signups = len(signups_data)
@@ -105,7 +105,7 @@ async def get_early_access_signups(
                 if signup_date >= month_start:
                     signups_this_month += 1
             except Exception as e:
-                print(f"Error parsing signup date: {str(e)}")
+                pass
                 continue
         
         stats = EarlyAccessStats(
@@ -127,7 +127,7 @@ async def get_early_access_signups(
         )
         
     except Exception as e:
-        print(f"Error fetching early access signups: {str(e)}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to fetch signups: {str(e)}")
 
 @router.post("/export")
@@ -165,7 +165,7 @@ async def export_early_access_signups(
         }
         
     except Exception as e:
-        print(f"Error exporting early access signups: {str(e)}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to export signups: {str(e)}")
 
 @router.post("/mark-confirmed/{email}")
@@ -207,5 +207,5 @@ async def mark_signup_confirmed(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error marking signup as confirmed: {str(e)}")
+        pass
         raise HTTPException(status_code=500, detail=f"Failed to mark as confirmed: {str(e)}")

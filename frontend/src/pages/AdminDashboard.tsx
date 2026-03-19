@@ -338,9 +338,8 @@ const AdminDashboard = () => {
         subscriptionRate: conversionRate
       });
       setSystemHealth(systemHealthData);
-    } catch (error) {
-      console.error('Failed to load dashboard data:', error);
-      toast.error('Failed to load dashboard data');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load dashboard data');
     } finally {
       setLoading(false);
     }
@@ -363,9 +362,8 @@ const AdminDashboard = () => {
         const analyticsData = await analyticsResponse.json();
         setAffiliateAnalytics(analyticsData);
       }
-    } catch (error) {
-      console.error('Failed to load affiliate data:', error);
-      toast.error('Failed to load affiliate data');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load affiliate data');
     } finally {
       setAffiliateLoading(false);
     }
@@ -388,9 +386,8 @@ const AdminDashboard = () => {
         const analyticsData = await analyticsResponse.json();
         setDiscountAnalytics(analyticsData);
       }
-    } catch (error) {
-      console.error('Failed to load discount data:', error);
-      toast.error('Failed to load discount data');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load discount data');
     } finally {
       setDiscountLoading(false);
     }
@@ -405,9 +402,8 @@ const AdminDashboard = () => {
         const data = await response.json();
         setEarlyAccessData(data);
       }
-    } catch (error) {
-      console.error('Failed to load early access data:', error);
-      toast.error('Failed to load early access data');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load early access data');
     } finally {
       setLoading(false);
     }
@@ -451,9 +447,8 @@ const AdminDashboard = () => {
         const error = await response.json();
         toast.error(error.detail || 'Failed to create discount');
       }
-    } catch (error) {
-      console.error('Failed to create discount:', error);
-      toast.error('Failed to create discount');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to create discount');
     } finally {
       setProcessing(false);
     }
@@ -472,9 +467,8 @@ const AdminDashboard = () => {
         const error = await response.json();
         toast.error(error.detail || 'Failed to update discount');
       }
-    } catch (error) {
-      console.error('Failed to update discount:', error);
-      toast.error('Failed to update discount');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update discount');
     } finally {
       setProcessing(false);
     }
@@ -493,9 +487,8 @@ const AdminDashboard = () => {
         const error = await response.json();
         toast.error(error.detail || 'Failed to delete discount');
       }
-    } catch (error) {
-      console.error('Failed to delete discount:', error);
-      toast.error('Failed to delete discount');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to delete discount');
     } finally {
       setProcessing(false);
     }
@@ -512,9 +505,8 @@ const AdminDashboard = () => {
       });
       toast.success('Subscription granted successfully');
       loadDashboardData();
-    } catch (error) {
-      console.error('Failed to grant subscription:', error);
-      toast.error('Failed to grant subscription');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to grant subscription');
     } finally {
       setProcessing(false);
     }
@@ -531,9 +523,8 @@ const AdminDashboard = () => {
       });
       toast.success('Subscription revoked successfully');
       loadDashboardData();
-    } catch (error) {
-      console.error('Failed to revoke subscription:', error);
-      toast.error('Failed to revoke subscription');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to revoke subscription');
     } finally {
       setProcessing(false);
     }
@@ -553,9 +544,8 @@ const AdminDashboard = () => {
       } else {
         toast.error('Failed to approve affiliate');
       }
-    } catch (error) {
-      console.error('Failed to approve affiliate:', error);
-      toast.error('Failed to approve affiliate');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to approve affiliate');
     } finally {
       setProcessing(false);
     }
@@ -566,9 +556,8 @@ const AdminDashboard = () => {
       setProcessing(true);
       // Note: This would need a revoke endpoint to be implemented
       toast.error('Revoke functionality not implemented yet');
-    } catch (error) {
-      console.error('Failed to revoke affiliate:', error);
-      toast.error('Failed to revoke affiliate');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to revoke affiliate');
     } finally {
       setProcessing(false);
     }

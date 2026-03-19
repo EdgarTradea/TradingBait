@@ -7,7 +7,7 @@ including journal entries, habits, trades, and calculated metrics.
 
 from typing import Dict, List, Any, Optional, Tuple
 from datetime import datetime, timedelta
-import databutton as db
+from firebase_admin import firestore
 from dataclasses import dataclass
 import pandas as pd
 from collections import defaultdict
@@ -94,45 +94,60 @@ class TradingDataAggregator:
     async def _get_trades_data(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Get trades data from storage"""
         try:
-            trades_key = f"{self.user_key}_trades"
-            trades_df = db.storage.dataframes.get(trades_key, default=pd.DataFrame())
+            db_firestore = firestore.client()
+            trades = []
             
-            if trades_df.empty:
-                return []
-            
-            # Filter by date range
-            if 'closeTime' in trades_df.columns:
-                trades_df['closeTime'] = pd.to_datetime(trades_df['closeTime'])
-                filtered_trades = trades_df[
-                    (trades_df['closeTime'] >= start_date) & 
-                    (trades_df['closeTime'] <= end_date)
-                ]
-                return filtered_trades.to_dict('records')
-            
-            return trades_df.to_dict('records')
+            # Use timezone-aware logic safely
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=datetime.now().astimezone().tzinfo)
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=start_date.tzinfo)
+                
+            evaluations_ref = db_firestore.collection(f"users/{self.user_id}/evaluations").stream()
+            for eval_doc in evaluations_ref:
+                eval_id = eval_doc.id
+                trades_ref = db_firestore.collection(f"users/{self.user_id}/evaluations/{eval_id}/trades").stream()
+                for trade_doc in trades_ref:
+                    trade_data = trade_doc.to_dict()
+                    if 'closeTime' in trade_data:
+                        close_time_str = trade_data['closeTime'].replace('Z', '+00:00')
+                        close_time = datetime.fromisoformat(close_time_str)
+                        if close_time.tzinfo is None:
+                            close_time = close_time.replace(tzinfo=start_date.tzinfo)
+                        if start_date <= close_time <= end_date:
+                            trades.append(trade_data)
+            return trades
             
         except Exception as e:
-            print(f"Error loading trades data: {e}")
+            pass
             return []
     
     async def _get_journal_entries(self, start_date: datetime, end_date: datetime) -> List[Dict[str, Any]]:
         """Get journal entries from storage"""
         try:
-            journal_key = f"{self.user_key}_journal_entries"
-            entries = db.storage.json.get(journal_key, default=[])
+            db_firestore = firestore.client()
+            entries_ref = db_firestore.collection(f"journal_entries/{self.user_id}/entries").stream()
             
-            # Filter by date range
+            # Use timezone-aware logic safely
+            if start_date.tzinfo is None:
+                start_date = start_date.replace(tzinfo=datetime.now().astimezone().tzinfo)
+            if end_date.tzinfo is None:
+                end_date = end_date.replace(tzinfo=start_date.tzinfo)
+                
             filtered_entries = []
-            for entry in entries:
+            for entry_doc in entries_ref:
+                entry = entry_doc.to_dict()
                 if 'date' in entry:
                     entry_date = datetime.fromisoformat(entry['date'].replace('Z', '+00:00'))
+                    if entry_date.tzinfo is None:
+                        entry_date = entry_date.replace(tzinfo=start_date.tzinfo)
                     if start_date <= entry_date <= end_date:
                         filtered_entries.append(entry)
             
             return filtered_entries
             
         except Exception as e:
-            print(f"Error loading journal entries: {e}")
+            pass
             return []
     
     async def _get_habit_data(self, start_date: datetime, end_date: datetime) -> Dict[str, List[bool]]:
@@ -150,7 +165,7 @@ class TradingDataAggregator:
             return dict(habit_data)
             
         except Exception as e:
-            print(f"Error loading habit data: {e}")
+            pass
             return {}
     
     def _calculate_performance_summary(self, trades: List[Dict[str, Any]]) -> Dict[str, Any]:

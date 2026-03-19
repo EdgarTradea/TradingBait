@@ -30,10 +30,10 @@ def verify_admin_access(user: AuthorizedUser):
         "admin-user-id",  # Workspace admin user ID
         "admin-user"  # Current workspace user ID
     ]
-    print(f"Admin check - Current user ID: {user.sub}")
-    print(f"Admin check - User email: {getattr(user, 'email', 'unknown')}")
+    pass
+    pass
     if user.sub not in admin_user_ids:
-        print(f"Access denied - User {user.sub} is not in admin list {admin_user_ids}")
+        pass
         raise HTTPException(status_code=403, detail="Admin access required")
 
 # === DATA MODELS ===
@@ -198,11 +198,11 @@ def send_affiliate_approval_email(affiliate_data: dict, referral_url: str) -> bo
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, [affiliate_email], msg.as_string())
         
-        print(f"Affiliate approval email sent successfully to {affiliate_email}")
+        pass
         return True
         
     except Exception as e:
-        print(f"Error sending affiliate approval email: {str(e)}")
+        pass
         return False
 
 def send_affiliate_rejection_email(affiliate_data: dict, admin_notes: str = None) -> bool:
@@ -329,11 +329,11 @@ def send_affiliate_rejection_email(affiliate_data: dict, admin_notes: str = None
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, [affiliate_email], msg.as_string())
         
-        print(f"Affiliate rejection email sent successfully to {affiliate_email}")
+        pass
         return True
         
     except Exception as e:
-        print(f"Error sending affiliate rejection email: {str(e)}")
+        pass
         return False
 
 # === API ENDPOINTS ===
@@ -405,7 +405,7 @@ async def list_affiliates(
         )
         
     except Exception as e:
-        print(f"Error listing affiliates: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to list affiliates")
 
 @router.post("/approve")
@@ -447,7 +447,7 @@ async def approve_affiliate(
         affiliate_ref.update(update_data)
         
         action_word = "approved" if request.action == "approve" else "rejected"
-        print(f"Admin {user.sub} {action_word} affiliate {request.affiliate_id}")
+        pass
         
         # Send email notification (non-blocking)
         try:
@@ -455,18 +455,18 @@ async def approve_affiliate(
                 referral_url = f"https://www.tradingbait.com/?ref={affiliate_data['referral_code']}"
                 email_sent = send_affiliate_approval_email(affiliate_data, referral_url)
                 if email_sent:
-                    print(f"Approval email sent successfully to {affiliate_data['email']}")
+                    pass
                 else:
-                    print(f"Warning: Failed to send approval email to {affiliate_data['email']}")
+                    pass
             else:
                 email_sent = send_affiliate_rejection_email(affiliate_data, request.notes)
                 if email_sent:
-                    print(f"Rejection email sent successfully to {affiliate_data['email']}")
+                    pass
                 else:
-                    print(f"Warning: Failed to send rejection email to {affiliate_data['email']}")
+                    pass
         except Exception as email_error:
             # Log email error but don't fail the approval process
-            print(f"Email notification error for affiliate {request.affiliate_id}: {str(email_error)}")
+            pass
         
         return AffiliateApprovalResponse(
             success=True,
@@ -476,7 +476,7 @@ async def approve_affiliate(
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error approving affiliate: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to process affiliate application")
 
 @router.get("/analytics")
@@ -540,7 +540,7 @@ async def get_affiliate_program_analytics(user: AuthorizedUser) -> Dict[str, Any
         }
         
     except Exception as e:
-        print(f"Error getting affiliate analytics: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get affiliate analytics")
 
 @router.get("/referrals")
@@ -595,5 +595,5 @@ async def list_all_referrals(
         }
         
     except Exception as e:
-        print(f"Error listing referrals: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to list referrals")

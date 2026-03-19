@@ -365,7 +365,7 @@ async def _store_grouping_results(user_id: str, result: GroupingResult):
         db.storage.json.put(key, existing_data)
         
     except Exception as e:
-        print(f"Failed to store grouping results: {e}")
+        pass
 
 async def _get_groups_by_ids(user_id: str, group_ids: List[str]) -> List[Dict[str, Any]]:
     """Retrieve specific groups by their IDs"""

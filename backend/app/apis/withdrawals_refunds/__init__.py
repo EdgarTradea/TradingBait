@@ -185,7 +185,7 @@ async def create_withdrawal(request: WithdrawalRequest, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error creating withdrawal: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to process withdrawal")
 
 @router.delete("/withdrawals/{transaction_id}")
@@ -270,7 +270,7 @@ async def delete_withdrawal(transaction_id: str, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting withdrawal: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to delete withdrawal")
 
 # ============================================================================
@@ -369,7 +369,7 @@ async def create_refund(request: RefundRequest, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error creating refund: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to process refund")
 
 @router.delete("/refunds/{transaction_id}")
@@ -452,7 +452,7 @@ async def delete_refund(transaction_id: str, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting refund: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to delete refund")
 
 # ============================================================================
@@ -516,7 +516,7 @@ async def get_transaction_history(user: AuthorizedUser, transaction_type: Option
         )
         
     except Exception as e:
-        print(f"Error getting transaction history: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get transaction history")
 
 @router.get("/transactions/{transaction_id}", response_model=Transaction)
@@ -538,7 +538,7 @@ async def get_transaction(transaction_id: str, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error getting transaction: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get transaction")
 
 # ============================================================================
@@ -615,7 +615,7 @@ async def get_financial_summary(
         )
         
     except Exception as e:
-        print(f"Error getting financial summary: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get financial summary")
 
 # ============================================================================

@@ -131,7 +131,6 @@ const TradingJournalContent = React.memo(() => {
       const response = await brain.get_habit_definitions();
       
       if (!response.ok) {
-        console.error('❌ loadUserHabits: Failed to fetch habits:', response.status);
         if (response.status === 404) {
           console.log('📝 No habits found, starting with empty list');
           setCustomHabits([]);
@@ -157,8 +156,8 @@ const TradingJournalContent = React.memo(() => {
       setCustomHabits(transformedHabits);
       setHabitsLoaded(true);
       
-    } catch (error) {
-      console.error('❌ loadUserHabits: Error:', error);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load habits');
       setCustomHabits([]);
       setHabitsLoaded(true);
     }
@@ -185,11 +184,11 @@ const TradingJournalContent = React.memo(() => {
         console.log('✅ loadJournalEntries: Received entries:', data.entries?.length || 0);
         setJournalEntries(data.entries || []);
       } else {
-        console.error('❌ loadJournalEntries: Failed to fetch entries:', response.status);
+        toast.error(`Failed to fetch journal entries: ${response.status}`);
         setJournalEntries([]);
       }
-    } catch (error) {
-      console.error('❌ loadJournalEntries: Error:', error);
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to fetch journal entries');
       setJournalEntries([]);
     } finally {
       setJournalEntriesLoading(false);
@@ -227,7 +226,7 @@ const TradingJournalContent = React.memo(() => {
           setHabitChecked(emptyHabits);
           return;
         }
-        console.error('Failed to load journal entry:', response.status);
+        toast.error(`Failed to load journal entry: ${response.status}`);
         return;
       }
 
@@ -271,9 +270,8 @@ const TradingJournalContent = React.memo(() => {
       console.log('✅ HABIT CHECK STATE:', habitCheckState);
       setHabitChecked(habitCheckState);
 
-    } catch (error) {
-      console.error('Error loading journal entry:', error);
-      toast.error('Failed to load journal entry for selected date');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load journal entry for selected date');
     }
   }, [user, selectedDate, customHabits]);
 
@@ -296,8 +294,8 @@ const TradingJournalContent = React.memo(() => {
         const correlationData = await correlationResponse.value.json();
         setCorrelationData(correlationData);
       }
-    } catch (error) {
-      console.error('❌ Error loading analytics data:', error);
+    } catch (error: any) {
+      toast.error(error?.message || 'Error loading analytics data');
     }
   }, [user]);
 
@@ -323,8 +321,8 @@ const TradingJournalContent = React.memo(() => {
         const insightsData = await insightsResponse.value.json();
         setBehavioralInsights(insightsData);
       }
-    } catch (error) {
-      console.error('❌ Error loading warnings data:', error);
+    } catch (error: any) {
+      toast.error(error?.message || 'Error loading warnings data');
       setWarningTabError('Failed to load warnings data');
     } finally {
       setWarningTabLoading(false);
@@ -343,9 +341,8 @@ const TradingJournalContent = React.memo(() => {
         setWeeklyReviewTotalCount(data.total || 0);
         setWeeklyReviewPage(page);
       }
-    } catch (error) {
-      console.error('Error fetching weekly reviews:', error);
-      toast.error('Failed to load weekly reviews');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load weekly reviews');
     } finally {
       setWeeklyReviewsLoading(false);
     }
@@ -363,9 +360,8 @@ const TradingJournalContent = React.memo(() => {
         const error = await response.json().catch(() => null);
         toast.error(error?.detail || 'Failed to create weekly review');
       }
-    } catch (error) {
-      console.error('Error creating weekly review:', error);
-      toast.error('Failed to create weekly review');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to create weekly review');
     }
   }, [fetchWeeklyReviews]);
 
@@ -383,9 +379,8 @@ const TradingJournalContent = React.memo(() => {
       } else {
         toast.error('Failed to load weekly review details');
       }
-    } catch (error) {
-      console.error('Error loading weekly review:', error);
-      toast.error('Failed to load weekly review');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to load weekly review');
     }
   }, []);
 
@@ -411,8 +406,8 @@ const TradingJournalContent = React.memo(() => {
         // CRITICAL: Load today's entry AFTER habits are loaded to prevent race condition
         await loadTodaysEntry();
 
-      } catch (error) {
-        console.error('❌ Error loading initial data:', error);
+      } catch (error: any) {
+        toast.error(error?.message || 'Error loading initial data');
       } finally {
         setLoading(false);
       }
@@ -500,12 +495,11 @@ const TradingJournalContent = React.memo(() => {
         // REMOVED: await loadTodaysEntry(); // This was causing habit states to revert
       } else {
         const errorText = await response.text().catch(() => 'Unknown error');
-        console.error('🔍 saveJournalEntry: API error response:', errorText);
+        toast.error(`API error: ${errorText}`);
         throw new Error('Failed to save journal entry');
       }
-    } catch (error) {
-      console.error('❌ Error saving journal entry:', error);
-      toast.error('Failed to save journal entry');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save journal entry');
     } finally {
       setLoading(false);
     }
@@ -543,8 +537,8 @@ const TradingJournalContent = React.memo(() => {
       } else {
         throw new Error('Failed to save journal entry');
       }
-    } catch (error) {
-      console.error('❌ updateHabits: Error updating habits:', error);
+    } catch (error: any) {
+      toast.error(error?.message || 'Error updating habits');
       // Don't show error toast for habit updates as it can be noisy
       throw error; // Re-throw to handle in UI
     }
@@ -587,9 +581,8 @@ const TradingJournalContent = React.memo(() => {
       } else {
         throw new Error('Failed to save habit');
       }
-    } catch (error) {
-      console.error('❌ Habit save failed:', error);
-      toast.error('Failed to save habit');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to save habit');
       // Revert the UI state on error
       setHabitChecked(prev => ({ ...prev, [habitId]: !newState }));
     }
@@ -605,9 +598,8 @@ const TradingJournalContent = React.memo(() => {
       
       // Save to backend immediately
       await saveHabitState(habitId, newState);
-    } catch (error) {
-      console.error('Error toggling habit:', error);
-      toast.error('Failed to update habit');
+    } catch (error: any) {
+      toast.error(error?.message || 'Failed to update habit');
     }
   }, [habitChecked, saveHabitState]);
 
@@ -647,11 +639,9 @@ const TradingJournalContent = React.memo(() => {
         toast.success('Habit added successfully!');
       } else {
         const errorData = await response.json().catch(() => null);
-        console.error('❌ Failed to create habit:', errorData);
         toast.error(errorData?.detail || 'Failed to add habit');
       }
     } catch (error) {
-      console.error('❌ Error adding habit:', error.message || error.toString());
       toast.error('Failed to add habit. Please try again.');
     }
   }, [newHabitText, newHabitCategory, loadUserHabits]);
@@ -688,11 +678,9 @@ const TradingJournalContent = React.memo(() => {
         toast.success('Habit deleted successfully!');
       } else {
         const errorData = await response.json().catch(() => null);
-        console.error('❌ Failed to delete habit:', errorData);
         toast.error(errorData?.detail || 'Failed to delete habit');
       }
     } catch (error) {
-      console.error('❌ Error deleting habit:', error.message || error.toString());
       toast.error('Failed to delete habit. Please try again.');
     }
   }, [loadUserHabits]);
@@ -787,8 +775,8 @@ const TradingJournalContent = React.memo(() => {
         lastTradingDay,
         analysis
       };
-    } catch (error) {
-      console.error('❌ Error calculating recent trading activity:', error);
+    } catch (error: any) {
+      toast.error(error?.message || 'Error calculating recent trading activity');
       return {
         period: '30 days',
         totalTrades: 0,

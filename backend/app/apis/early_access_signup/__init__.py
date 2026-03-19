@@ -34,7 +34,7 @@ def send_confirmation_email(email: str) -> bool:
         smtp_pass = os.environ.get("SMTP_PASS")
         
         if not all([smtp_host, smtp_user, smtp_pass]):
-            print("Missing SMTP configuration")
+            pass
             return False
         
         # Create email content
@@ -139,11 +139,11 @@ def send_confirmation_email(email: str) -> bool:
                 server.login(smtp_user, smtp_pass)
                 server.sendmail(smtp_user, email, msg.as_string())
         
-        print(f"Confirmation email sent successfully to {email}")
+        pass
         return True
         
     except Exception as e:
-        print(f"Failed to send confirmation email to {email}: {str(e)}")
+        pass
         return False
 
 @router.post("/early-access-signup")
@@ -192,7 +192,7 @@ async def early_access_signup(request: EarlyAccessSignupRequest) -> EarlyAccessS
             email_list.append(email)
             db.storage.json.put("early_access_emails_list", email_list)
         
-        print(f"✅ Early access signup stored successfully for {email}")
+        pass
         
         # Try to send confirmation email with proper SSL/TLS handling
         email_sent = False
@@ -203,9 +203,9 @@ async def early_access_signup(request: EarlyAccessSignupRequest) -> EarlyAccessS
                 signup_data["confirmed"] = True
                 signup_data["confirmation_sent_at"] = datetime.utcnow().isoformat()
                 db.storage.json.put(email_key, signup_data)
-                print(f"📧 Confirmation email sent successfully to {email}")
+                pass
         except Exception as e:
-            print(f"📧 Email sending failed but continuing: {str(e)}")
+            pass
         
         # Always return success since email is stored successfully
         return EarlyAccessSignupResponse(
@@ -215,7 +215,7 @@ async def early_access_signup(request: EarlyAccessSignupRequest) -> EarlyAccessS
         )
         
     except Exception as e:
-        print(f"❌ Error processing early access signup: {str(e)}")
+        pass
         raise HTTPException(
             status_code=500,
             detail="An error occurred while processing your signup. Please try again."
@@ -233,7 +233,7 @@ async def get_early_access_stats():
             "signup_count": len(email_list)
         }
     except Exception as e:
-        print(f"Error getting early access stats: {str(e)}")
+        pass
         return {
             "total_signups": 0,
             "signup_count": 0

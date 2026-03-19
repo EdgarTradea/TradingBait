@@ -4,7 +4,6 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File, Form
 from pydantic import BaseModel
 from typing import Optional, List, Dict, Any
-import databutton as db
 from openai import OpenAI
 import pandas as pd
 import json
@@ -20,6 +19,8 @@ from app.libs.trade_parser_prompt import (
     ParsedTrade,
     OPENAI_FUNCTION_SCHEMA
 )
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 import os
 
 # Import file processing libraries
@@ -122,8 +123,8 @@ def parse_trades_with_openai(text_content: str, file_type: str = "unknown") -> P
         
         # Parse the JSON response
         response_text = function_call.arguments
-        print(f"AI Parser Response received: {response_text[:500]}...")  # Log first 500 chars
-        print(f"Attempting to parse JSON response...")
+        pass
+        pass
         
         # Parse the JSON response
         parsed_data = json.loads(response_text)
@@ -131,9 +132,9 @@ def parse_trades_with_openai(text_content: str, file_type: str = "unknown") -> P
         # Debug: log the parsed structure
         if "analysis" in parsed_data and "trades" in parsed_data["analysis"]:
             trades = parsed_data["analysis"]["trades"]
-            print(f"Successfully parsed {len(trades)} trades from AI response")
+            pass
             for i, trade in enumerate(trades[:3]):  # Log first 3 trades
-                print(f"Trade {i+1}: symbol={trade.get('symbol')}, gross_pnl={trade.get('gross_pnl')}, commission={trade.get('commission')}, swap={trade.get('swap')}")
+                pass
         
         return ParseResponse(**parsed_data)
         
@@ -208,17 +209,17 @@ async def upload_and_parse_trades_endpoint(file: UploadFile, user: AuthorizedUse
     start_time = datetime.now()
     
     try:
-        print(f"=== AI PARSER DEBUG START ===")
-        print(f"Processing file: {file.filename}")
-        print(f"User ID: {user.sub}")
+        pass
+        pass
+        pass
         
         # Read and process file content
         file_content = await file.read()
-        print(f"File size: {len(file_content)} bytes")
+        pass
         
         # Detect file type
         file_type = detect_file_type(file.filename or "unknown")
-        print(f"File type detected: {file_type}")
+        pass
         
         # Convert to text based on file type
         if file_type == "csv":
@@ -238,8 +239,8 @@ async def upload_and_parse_trades_endpoint(file: UploadFile, user: AuthorizedUse
         if not text_content or len(text_content.strip()) < 10:
             raise HTTPException(status_code=400, detail="No readable content found in file")
         
-        print(f"Text content length: {len(text_content)} characters")
-        print(f"Sample content: {text_content[:200]}...")
+        pass
+        pass
         
         # Initialize OpenAI client
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -256,49 +257,49 @@ async def upload_and_parse_trades_endpoint(file: UploadFile, user: AuthorizedUse
             temperature=0.1
         )
         
-        print(f"=== AI RESPONSE RECEIVED ===")
+        pass
         function_call = response.choices[0].message.function_call
         if not function_call:
-            print("ERROR: No function call in response")
+            pass
             raise ValueError("No function call returned from AI")
             
-        print(f"=== COMPLETE RAW AI RESPONSE ===")
-        print(f"Function name: {function_call.name}")
-        print(f"Raw function arguments (FULL): {function_call.arguments}")
-        print(f"=== END RAW AI RESPONSE ===")
+        pass
+        pass
+        pass
+        pass
             
         # Parse the function arguments
         try:
             ai_result = json.loads(function_call.arguments)
-            print(f"=== AI PARSED RESULT ===")
-            print(f"Success: {ai_result.get('success', 'MISSING')}")
-            print(f"Total trades found: {ai_result.get('analysis', {}).get('total_trades_found', 'MISSING')}")
+            pass
+            pass
+            pass
             
             # Log first trade details for debugging
             trades = ai_result.get('analysis', {}).get('trades', [])
             if trades:
                 first_trade = trades[0]
-                print(f"=== FIRST TRADE COMPLETE DEBUG ===")
-                print(f"Complete first trade object: {json.dumps(first_trade, indent=2)}")
-                print(f"Symbol: {first_trade.get('symbol', 'MISSING')}")
-                print(f"Type: {first_trade.get('type', 'MISSING')}")
-                print(f"Lots: {first_trade.get('lots', 'MISSING')}")
-                print(f"PnL: {first_trade.get('pnl', 'MISSING')}")
-                print(f"Commission: {first_trade.get('commission', 'MISSING')}")
-                print(f"Order Type: {first_trade.get('order_type', 'MISSING')}")
-                print(f"Open Time: {first_trade.get('openTime', 'MISSING')}")
-                print(f"Close Time: {first_trade.get('closeTime', 'MISSING')}")
-                print(f"All fields: {list(first_trade.keys())}")
+                pass
+                pass
+                pass
+                pass
+                pass
+                pass
+                pass
+                pass
+                pass
+                pass
+                pass
             
         except json.JSONDecodeError as e:
-            print(f"ERROR: Failed to parse AI function arguments: {e}")
-            print(f"Raw arguments: {function_call.arguments}")
+            pass
+            pass
             raise ValueError(f"Invalid JSON in AI response: {e}")
         
         # Calculate processing time
         processing_time = int((datetime.now() - start_time).total_seconds() * 1000)
-        print(f"=== PROCESSING COMPLETE ===")
-        print(f"Processing time: {processing_time}ms")
+        pass
+        pass
         
         # Save parsed results to storage for coach access
         try:
@@ -323,17 +324,13 @@ async def upload_and_parse_trades_endpoint(file: UploadFile, user: AuthorizedUse
                     "user_id": user.sub
                 }
                 
-                def sanitize_storage_key(key: str) -> str:
-                    return re.sub(r'[^a-zA-Z0-9._-]', '', key)
-                
-                sanitized_key = sanitize_storage_key(storage_key)
-                db.storage.json.put(sanitized_key, storage_data)
-                
-                print(f"✅ Saved parsed results to storage: {sanitized_key}")
-                print(f"📊 Saved {len(ai_result.get('analysis', {}).get('trades', []))} trades for coach access")
-                
-        except Exception as storage_error:
-            print(f"⚠️ Failed to save to storage (non-critical): {storage_error}")
+                try:
+                    initialize_firebase()
+                    db_firestore = firestore.client()
+                    ts_key = str(int(datetime.now().timestamp()))
+                    db_firestore.collection("users").document(user.sub).collection("ai_parse_results").document(ts_key).set(storage_data)
+                except Exception as storage_error:
+                    pass
         
         return FileUploadResponse(
             success=ai_result.get('success', False),

@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" fill="none">
+  <rect width="512" height="512" rx="80" fill="#0F1117"/>
+  <!-- Candlestick chart bars -->
+  <rect x="80" y="230" width="48" height="160" rx="6" fill="#22C55E"/>
+  <line x1="104" y1="200" x2="104" y2="230" stroke="#22C55E" stroke-width="6" stroke-linecap="round"/>
+  <line x1="104" y1="390" x2="104" y2="420" stroke="#22C55E" stroke-width="6" stroke-linecap="round"/>
+
+  <rect x="170" y="180" width="48" height="120" rx="6" fill="#EF4444"/>
+  <line x1="194" y1="140" x2="194" y2="180" stroke="#EF4444" stroke-width="6" stroke-linecap="round"/>
+  <line x1="194" y1="300" x2="194" y2="340" stroke="#EF4444" stroke-width="6" stroke-linecap="round"/>
+
+  <rect x="260" y="200" width="48" height="140" rx="6" fill="#22C55E"/>
+  <line x1="284" y1="160" x2="284" y2="200" stroke="#22C55E" stroke-width="6" stroke-linecap="round"/>
+  <line x1="284" y1="340" x2="284" y2="380" stroke="#22C55E" stroke-width="6" stroke-linecap="round"/>
+
+  <rect x="350" y="150" width="48" height="180" rx="6" fill="#22C55E"/>
+  <line x1="374" y1="110" x2="374" y2="150" stroke="#22C55E" stroke-width="6" stroke-linecap="round"/>
+  <line x1="374" y1="330" x2="374" y2="370" stroke="#22C55E" stroke-width="6" stroke-linecap="round"/>
+
+  <!-- Uptrend arrow -->
+  <path d="M 430 380 L 460 340 L 490 290 L 510 260" stroke="#22C55E" stroke-width="5" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+</svg>

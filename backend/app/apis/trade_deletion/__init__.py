@@ -49,7 +49,7 @@ async def delete_account_trades(request: DeleteAccountTradesRequest, user: Autho
         )
         
     except Exception as e:
-        print(f"Error deleting account trades: {str(e)}")
+        pass
         raise HTTPException(
             status_code=500,
             detail=f"Failed to delete trades for account: {str(e)}"
@@ -84,7 +84,7 @@ async def delete_all_user_trades(user: AuthorizedUser) -> DeleteAllTradesRespons
         )
         
     except Exception as e:
-        print(f"Error deleting all trades: {str(e)}")
+        pass
         raise HTTPException(
             status_code=500,
             detail=f"Failed to delete all trades: {str(e)}"

@@ -33,16 +33,16 @@ def verify_admin_access(user: AuthorizedUser):
         "grau.edgar@protonmail.com"  # Current workspace user email
     ]
     
-    print(f"Admin check - Current user ID: {user.sub}")
-    print(f"Admin check - User email: {getattr(user, 'email', 'unknown')}")
+    pass
+    pass
     
     user_email = getattr(user, 'email', '')
     
     # Check both user ID and email patterns
     if user.sub not in admin_user_ids and user_email not in admin_emails and user.sub not in admin_emails:
-        print(f"Access denied - User {user.sub} with email {user_email} is not in admin list")
+        pass
         raise HTTPException(status_code=403, detail="Admin access required")
-    print(f"Admin access granted to user {user.sub} with email {user_email}")
+    pass
 
 def sanitize_storage_key(key: str) -> str:
     """Sanitize storage key to only allow alphanumeric and ._- symbols"""
@@ -86,14 +86,14 @@ def list_all_users(page: int = 1, limit: int = 50, user: AuthorizedUser = None) 
         verify_admin_access(user)
     
     try:
-        print(f"Loading users for admin dashboard (page {page}, limit {limit})")
+        pass
         
         # Get Firebase users
         firebase_users = []
         result = firebase_auth.list_users(max_results=min(limit, 1000))
         firebase_users.extend(result.users)
         
-        print(f"Found {len(firebase_users)} Firebase users")
+        pass
         
         # Process Firebase users
         users = []
@@ -120,7 +120,7 @@ def list_all_users(page: int = 1, limit: int = 50, user: AuthorizedUser = None) 
                         try:
                             creation_date = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
                         except (ValueError, OSError) as ts_error:
-                            print(f"Invalid timestamp {timestamp} for user {user_id}: {ts_error}")
+                            pass
                             creation_date = "Invalid"
                     else:
                         creation_date = str(timestamp)[:10]  # Fallback to string conversion
@@ -138,14 +138,14 @@ def list_all_users(page: int = 1, limit: int = 50, user: AuthorizedUser = None) 
                         try:
                             last_login = datetime.fromtimestamp(timestamp).strftime("%Y-%m-%d")
                         except (ValueError, OSError) as ts_error:
-                            print(f"Invalid timestamp {timestamp} for user {user_id}: {ts_error}")
+                            pass
                             last_login = "Invalid"
                     else:
                         last_login = str(timestamp)[:10]  # Fallback to string conversion
                         
             except Exception as e:
-                print(f"Error processing timestamps for {user_id}: {e}")
-                print(f"Timestamp types - creation: {type(firebase_user.user_metadata.creation_timestamp) if firebase_user.user_metadata.creation_timestamp else 'None'}, last_login: {type(firebase_user.user_metadata.last_sign_in_timestamp) if firebase_user.user_metadata.last_sign_in_timestamp else 'None'}")
+                pass
+                pass
             
             # Check for subscription data - FIXED LOGIC
             subscription_type = "none"  # Default to "none" instead of "free"
@@ -161,13 +161,13 @@ def list_all_users(page: int = 1, limit: int = 50, user: AuthorizedUser = None) 
                     subscription_type = subscription_data.get("subscription_type", "unknown")
                     subscription_status = subscription_data.get("subscription_status", "unknown")
                     subscription_granted_by = subscription_data.get("granted_by")
-                    print(f"Found subscription for {user_email}: {subscription_type} - {subscription_status}")
+                    pass
                 else:
                     # No subscription record found - user has no subscription
-                    print(f"No subscription record for {user_email} - showing as no subscription")
+                    pass
             except Exception as e:
                 # No subscription found - this is normal for users without subscriptions
-                print(f"No subscription found for {user_email}: {e}")
+                pass
                 # Keep defaults: subscription_type = "none", subscription_status = "no_subscription"
             
             # Create user summary
@@ -190,11 +190,11 @@ def list_all_users(page: int = 1, limit: int = 50, user: AuthorizedUser = None) 
             
             users.append(user_summary)
         
-        print(f"Processed {len(users)} users for admin dashboard")
+        pass
         return users
         
     except Exception as e:
-        print(f"Error in list_all_users: {e}")
+        pass
         # Return minimal fallback data
         return [
             UserAccessSummary(
@@ -241,9 +241,9 @@ def grant_subscription(request: SubscriptionManagementRequest, user: AuthorizedU
                     user_record = auth.get_user(request.user_id)
                     user_email = user_record.email
                 except Exception as e:
-                    print(f"Could not fetch user email from Firebase Auth: {e}")
+                    pass
         except Exception as e:
-            print(f"Error fetching user email: {e}")
+            pass
         
         # Prepare subscription data
         subscription_data = {
@@ -261,7 +261,7 @@ def grant_subscription(request: SubscriptionManagementRequest, user: AuthorizedU
         db.storage.json.put(subscription_key, subscription_data)
         
         email_info = f" (email: {user_email})" if user_email else " (email not found)"
-        print(f"Admin {user.sub} granted {request.subscription_type} subscription to user {request.user_id}{email_info}")
+        pass
         
         return SubscriptionManagementResponse(
             success=True,
@@ -269,7 +269,7 @@ def grant_subscription(request: SubscriptionManagementRequest, user: AuthorizedU
         )
         
     except Exception as e:
-        print(f"Error granting subscription: {e}")
+        pass
         return SubscriptionManagementResponse(
             success=False,
             message=f"Failed to grant subscription: {str(e)}"
@@ -298,7 +298,7 @@ def revoke_subscription(request: SubscriptionManagementRequest, user: Authorized
         # Store revoked subscription data
         db.storage.json.put(subscription_key, subscription_data)
         
-        print(f"Admin {user.sub} revoked subscription from user {request.user_id}")
+        pass
         
         return SubscriptionManagementResponse(
             success=True,
@@ -306,7 +306,7 @@ def revoke_subscription(request: SubscriptionManagementRequest, user: Authorized
         )
         
     except Exception as e:
-        print(f"Error revoking subscription: {e}")
+        pass
         return SubscriptionManagementResponse(
             success=False,
             message=f"Failed to revoke subscription: {str(e)}"

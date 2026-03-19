@@ -188,7 +188,7 @@ def generate_ai_insights(trades: List[TradeData], metrics: CalculatedMetrics) ->
         return result
         
     except Exception as e:
-        print(f"Error generating AI insights: {e}")
+        pass
         # Return fallback insights
         return {
             "overview_insights": [
@@ -209,7 +209,7 @@ async def generate_analytics_insights(request: AnalyticsInsightsRequest) -> Anal
     
     user_id = request.user_id
     
-    print(f"🔍 AI Insights request: user={user_id}, trades_count={len(request.trades)}")
+    pass
     
     # Check trial usage limits before generating insights
     can_generate, remaining = check_trial_usage_limit(user_id, "analytics_insights")
@@ -233,14 +233,14 @@ async def generate_analytics_insights(request: AnalyticsInsightsRequest) -> Anal
                 advanced_insights=[]
             )
     
-    print(f"✅ Generating AI insights for {len(request.trades)} trades")
+    pass
     
     # Generate AI insights
     insights = generate_ai_insights(request.trades, request.calculated_metrics)
     
     # Update trial usage after successful generation
     update_trial_usage(user_id, "analytics_insights", 1)
-    print(f"Updated trial usage: analytics_insights +1 for user {user_id}")
+    pass
     
     # Prepare response
     response_data = {

@@ -62,5 +62,5 @@ def configure_cors(app: FastAPI):
     # Add our global CORS middleware for comprehensive coverage
     app.add_middleware(GlobalCORSMiddleware)
     
-    print("CORS middleware configured for production domains")
+    pass
     return app

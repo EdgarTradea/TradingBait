@@ -14,7 +14,7 @@ environment = os.getenv("ENV", "dev")
 env_file = f".env.{environment}"
 dotenv.load_dotenv(env_file, override=True)
 
-print(f"Loaded environment: {environment}")
+pass
 
 from databutton_app.mw.auth_mw import AuthConfig, get_authorized_user
 
@@ -51,7 +51,7 @@ def import_api_routers() -> APIRouter:
     api_module_prefix = "app.apis."
 
     for name in api_names:
-        print(f"Importing API: {name}")
+        pass
         try:
             api_module = __import__(api_module_prefix + name, fromlist=[name])
             api_router = getattr(api_module, "router", None)
@@ -65,10 +65,10 @@ def import_api_routers() -> APIRouter:
                     ),
                 )
         except Exception as e:
-            print(e)
+            pass
             continue
 
-    print(routes.routes)
+    pass
 
     return routes
 
@@ -134,15 +134,15 @@ def create_app() -> FastAPI:
     for route in app.routes:
         if hasattr(route, "methods"):
             for method in route.methods:
-                print(f"{method} {route.path}")
+                pass
 
     auth_configs = parse_auth_configs()
 
     if len(auth_configs) == 0:
-        print("No auth extensions found")
+        pass
         app.state.auth_configs = None
     else:
-        print(f"Found {len(auth_configs)} auth config(s)")
+        pass
         app.state.auth_configs = auth_configs
 
     return app

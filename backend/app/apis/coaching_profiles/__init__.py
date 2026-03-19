@@ -90,7 +90,7 @@ def sanitize_key(key: str) -> str:
 async def assess_trader(request: TraderAssessmentRequest, user: AuthorizedUser) -> TraderProfile:
     """Create comprehensive trader assessment and generate personalized coaching profile"""
     try:
-        print(f"🎯 Creating trader assessment for user {user.sub}")
+        pass
         
         # Generate unique profile ID
         profile_id = f"profile_{int(datetime.now().timestamp() * 1000)}"
@@ -144,11 +144,11 @@ async def assess_trader(request: TraderAssessmentRequest, user: AuthorizedUser) 
         })
         db.storage.json.put(history_key, history)
         
-        print(f"✅ Trader profile created: {profile_id}")
+        pass
         return profile
         
     except Exception as e:
-        print(f"❌ Error creating trader assessment: {str(e)}")
+        pass
         raise
 
 @router.get("/profile")
@@ -163,7 +163,7 @@ async def get_trader_profile(user: AuthorizedUser) -> Optional[TraderProfile]:
         return None
         
     except Exception as e:
-        print(f"❌ Error retrieving trader profile: {str(e)}")
+        pass
         return None
 
 @router.put("/profile")
@@ -197,11 +197,11 @@ async def update_trader_profile(request: UpdateProfileRequest, user: AuthorizedU
         # Store updated profile
         db.storage.json.put(profile_key, current_profile.dict())
         
-        print(f"✅ Trader profile updated: {current_profile.profile_id}")
+        pass
         return current_profile
         
     except Exception as e:
-        print(f"❌ Error updating trader profile: {str(e)}")
+        pass
         raise
 
 @router.post("/coaching-style")
@@ -231,7 +231,7 @@ async def get_personalized_coaching_style(request: CoachingStyleRequest, user: A
         return coaching_style
         
     except Exception as e:
-        print(f"❌ Error generating coaching style: {str(e)}")
+        pass
         raise
 
 @router.get("/development-areas")
@@ -257,7 +257,7 @@ async def get_development_areas(user: AuthorizedUser) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"❌ Error retrieving development areas: {str(e)}")
+        pass
         raise
 
 # AI Analysis Functions
@@ -321,7 +321,7 @@ Provide detailed, actionable analysis based on trading psychology principles.
         return analysis
         
     except Exception as e:
-        print(f"❌ Error generating trader analysis: {str(e)}")
+        pass
         return {"error": str(e)}
 
 async def generate_coaching_recommendations(assessment_data: Dict[str, Any], ai_analysis: Dict[str, Any]) -> Dict[str, Any]:
@@ -383,7 +383,7 @@ Focus on practical, actionable coaching strategies.
         return recommendations
         
     except Exception as e:
-        print(f"❌ Error generating coaching recommendations: {str(e)}")
+        pass
         return {"error": str(e)}
 
 async def generate_development_plan(assessment_data: Dict[str, Any], ai_analysis: Dict[str, Any]) -> Dict[str, Any]:
@@ -452,7 +452,7 @@ Create a realistic, achievable development plan.
         return plan
         
     except Exception as e:
-        print(f"❌ Error generating development plan: {str(e)}")
+        pass
         return {"error": str(e)}
 
 async def generate_personalized_coaching_approach(profile: TraderProfile, session_type: str, user_context: Optional[str], recent_performance: Optional[Dict[str, Any]]) -> Dict[str, Any]:
@@ -511,7 +511,7 @@ Tailor the approach to this specific trader and session type.
         return approach
         
     except Exception as e:
-        print(f"❌ Error generating personalized coaching approach: {str(e)}")
+        pass
         return {"error": str(e)}
 
 @router.get("/health")

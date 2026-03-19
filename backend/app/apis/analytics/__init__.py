@@ -69,7 +69,7 @@ async def get_performance_metrics(
         return PerformanceStats(**analytics_data)
         
     except Exception as e:
-        print(f"❌ Error getting performance metrics: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/realtime", response_model=RealTimeStats)
@@ -84,7 +84,7 @@ async def get_realtime_stats(user: AuthorizedUser) -> RealTimeStats:
         return RealTimeStats(**stats_data)
         
     except Exception as e:
-        print(f"❌ Error getting real-time stats: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/errors")
@@ -100,7 +100,7 @@ async def get_error_reports(
         return []
         
     except Exception as e:
-        print(f"❌ Error getting error reports: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/user-analytics", response_model=UserAnalytics)
@@ -125,7 +125,7 @@ async def get_user_analytics(
         )
         
     except Exception as e:
-        print(f"❌ Error getting user analytics: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.get("/health")
@@ -162,7 +162,7 @@ async def get_analytics_system_health(user: AuthorizedUser) -> Dict[str, Any]:
         }
         
     except Exception as e:
-        print(f"❌ Error getting system health: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))
 
 @router.post("/track-event")
@@ -170,10 +170,10 @@ def track_analytics_user_event(event: TrackingEvent, user: AuthorizedUser) -> Tr
     """Track a user event for analytics"""
     try:
         # This would integrate with the user analytics system
-        print(f"📊 User event tracked: {event.event_type} for user {user.sub}")
+        pass
         
         if event.properties:
-            print(f"   Properties: {event.properties}")
+            pass
         
         return TrackingResponse(
             status="success",
@@ -182,5 +182,5 @@ def track_analytics_user_event(event: TrackingEvent, user: AuthorizedUser) -> Tr
         )
         
     except Exception as e:
-        print(f"❌ Error tracking user event: {e}")
+        pass
         raise HTTPException(status_code=500, detail=str(e))

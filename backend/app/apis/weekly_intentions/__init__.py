@@ -1,17 +1,20 @@
-"""Weekly Intentions API for Trading Journal
-
-Handles weekly goal setting with automatic Sunday reset logic
-"""
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, List, Any, Optional
 from datetime import datetime, timedelta
 from app.auth import AuthorizedUser
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 import re
 
 router = APIRouter(prefix="/weekly-intentions")
+
+def _db():
+    initialize_firebase()
+    return firestore.client()
+
+def _intentions_col(user_id: str):
+    return _db().collection("users").document(user_id).collection("weekly_intentions")
 
 # Data Models
 class WeeklyIntentions(BaseModel):
@@ -83,67 +86,44 @@ def is_editable_time() -> bool:
     return is_sunday()
 
 def load_user_weekly_intentions(user_id: str) -> List[Dict[str, Any]]:
-    """Load all weekly intentions for a user"""
+    """Load all weekly intentions for a user from Firestore"""
     try:
-        intentions_key = get_user_weekly_intentions_key(user_id)
-        intentions_data = db.storage.json.get(intentions_key, default=[])
-        
-        # Ensure it's a list
-        if not isinstance(intentions_data, list):
-            return []
-        
-        return intentions_data
-    except Exception as e:
-        print(f"Error loading weekly intentions for user {user_id}: {e}")
+        docs = _intentions_col(user_id).stream()
+        return [doc.to_dict() for doc in docs]
+    except Exception:
         return []
 
-def save_user_weekly_intentions(user_id: str, intentions_list: List[Dict[str, Any]]) -> bool:
-    """Save weekly intentions list for a user"""
+def save_week_intention(user_id: str, week_start_date: str, intention_data: Dict[str, Any]) -> bool:
+    """Save a single week's intention to Firestore"""
     try:
-        intentions_key = get_user_weekly_intentions_key(user_id)
-        db.storage.json.put(intentions_key, intentions_list)
+        _intentions_col(user_id).document(week_start_date).set(intention_data)
         return True
-    except Exception as e:
-        print(f"Error saving weekly intentions for user {user_id}: {e}")
+    except Exception:
         return False
 
 def archive_previous_weeks(user_id: str, current_week_start: str) -> bool:
     """Archive any previous weeks that are not archived yet"""
     try:
-        intentions_list = load_user_weekly_intentions(user_id)
-        updated = False
-        
-        for intention in intentions_list:
-            # Archive any week that's not the current week and not already archived
-            if intention.get('week_start_date') != current_week_start and not intention.get('is_archived', False):
-                intention['is_archived'] = True
-                updated = True
-        
-        if updated:
-            save_user_weekly_intentions(user_id, intentions_list)
-        
+        docs = _intentions_col(user_id).where("is_archived", "==", False).stream()
+        for doc in docs:
+            if doc.id != current_week_start:
+                doc.reference.update({"is_archived": True})
         return True
-    except Exception as e:
-        print(f"Error archiving previous weeks for user {user_id}: {e}")
+    except Exception:
         return False
 
 def get_current_week_intentions(user_id: str) -> Optional[Dict[str, Any]]:
     """Get intentions for the current week"""
     try:
         current_week_start = get_week_start_date().strftime('%Y-%m-%d')
-        intentions_list = load_user_weekly_intentions(user_id)
-        
-        # Archive previous weeks first
         archive_previous_weeks(user_id, current_week_start)
-        
-        # Find current week's intentions
-        for intention in intentions_list:
-            if intention.get('week_start_date') == current_week_start and not intention.get('is_archived', False):
-                return intention
-        
+        doc = _intentions_col(user_id).document(current_week_start).get()
+        if doc.exists:
+            data = doc.to_dict()
+            if not data.get('is_archived', False):
+                return data
         return None
-    except Exception as e:
-        print(f"Error getting current week intentions for user {user_id}: {e}")
+    except Exception:
         return None
 
 # API Endpoints
@@ -173,7 +153,7 @@ async def get_current_weekly_intentions(user: AuthorizedUser):
             )
     
     except Exception as e:
-        print(f"Error getting current weekly intentions: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get current weekly intentions")
 
 @router.post("/current", response_model=WeeklyIntentionsResponse)
@@ -212,13 +192,11 @@ async def create_or_update_current_weekly_intentions(
                 break
         
         if current_intentions:
-            # Update existing intentions
             current_intentions['trading_goals'] = request.trading_goals
             current_intentions['personal_goals'] = request.personal_goals
             current_intentions['updated_at'] = now
         else:
-            # Create new intentions for current week
-            new_intentions = {
+            current_intentions = {
                 'week_start_date': current_week_start,
                 'trading_goals': request.trading_goals,
                 'personal_goals': request.personal_goals,
@@ -226,24 +204,20 @@ async def create_or_update_current_weekly_intentions(
                 'updated_at': now,
                 'is_archived': False
             }
-            intentions_list.append(new_intentions)
-            current_intentions = new_intentions
-        
-        # Save updated list
-        if save_user_weekly_intentions(user_id, intentions_list):
-            intentions_obj = WeeklyIntentions(**current_intentions)
-            return WeeklyIntentionsResponse(
-                success=True,
-                intentions=intentions_obj,
-                message="Weekly intentions saved successfully",
-                is_editable=True,
-                days_until_sunday=0
-            )
-        else:
-            raise HTTPException(status_code=500, detail="Failed to save weekly intentions")
-    
+
+        save_week_intention(user_id, current_week_start, current_intentions)
+        intentions_obj = WeeklyIntentions(**current_intentions)
+        return WeeklyIntentionsResponse(
+            success=True,
+            intentions=intentions_obj,
+            message="Weekly intentions saved successfully",
+            is_editable=True,
+            days_until_sunday=0
+        )
+
+    except HTTPException:
+        raise
     except Exception as e:
-        print(f"Error creating/updating weekly intentions: {e}")
         raise HTTPException(status_code=500, detail="Failed to save weekly intentions")
 
 @router.get("/history", response_model=WeeklyIntentionsListResponse)
@@ -281,7 +255,7 @@ async def get_weekly_intentions_history(user: AuthorizedUser):
         )
     
     except Exception as e:
-        print(f"Error getting weekly intentions history: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to get weekly intentions history")
 
 @router.post("/sunday-reset")
@@ -306,7 +280,7 @@ async def trigger_sunday_reset(user: AuthorizedUser):
             raise HTTPException(status_code=500, detail="Failed to complete Sunday reset")
     
     except Exception as e:
-        print(f"Error during Sunday reset: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to complete Sunday reset")
 
 @router.get("/health")

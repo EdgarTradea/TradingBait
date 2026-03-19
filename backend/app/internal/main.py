@@ -78,11 +78,11 @@ def _health_shutdown_countdown():
         return
     health_shutdown_counter -= 1
     if health_shutdown_counter < 0:
-        print("Health checks completed, shutting down.")
+        pass
         time.sleep(1)
         signal.raise_signal(signal.SIGTERM)
     else:
-        print(f"{health_shutdown_counter} health checks left until shutdown")
+        pass
 
 
 # NB: Name of this function becomes a property of the generated api client and callable by the user web app

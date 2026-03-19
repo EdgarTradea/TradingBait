@@ -101,7 +101,7 @@ class ApiTestRunner:
         body: Optional[Dict] = None
     ) -> PerformanceBenchmark:
         """Run load test on endpoint"""
-        print(f"🚀 Load testing {endpoint} with {concurrent_requests} concurrent requests...")
+        pass
         
         results: List[TestResult] = []
         
@@ -146,15 +146,15 @@ class ApiTestRunner:
         
         self.benchmarks.append(benchmark)
         
-        print(f"✅ Load test completed")
-        print(f"📊 Success rate: {benchmark.success_rate:.1f}%")
-        print(f"⏱️  Average response time: {benchmark.average_response_time:.0f}ms")
+        pass
+        pass
+        pass
         
         return benchmark
     
     async def run_health_checks(self) -> List[TestResult]:
         """Run basic health checks"""
-        print('🏥 Running health checks...')
+        pass
         
         health_endpoints = [
             '/routes/health/check',
@@ -168,13 +168,13 @@ class ApiTestRunner:
                 result = await self.test_endpoint(session, endpoint)
                 results.append(result)
                 status_icon = '✅' if result.success else '❌'
-                print(f"{status_icon} {endpoint}: {result.status} ({result.response_time:.0f}ms)")
+                pass
         
         return results
     
     async def run_critical_user_journeys(self) -> List[TestResult]:
         """Test critical user journey endpoints"""
-        print('👤 Testing critical user journeys...')
+        pass
         
         journeys = [
             # Trading data management
@@ -205,13 +205,13 @@ class ApiTestRunner:
                 )
                 results.append(result)
                 status_icon = '✅' if result.success else '❌'
-                print(f"{status_icon} {journey['endpoint']}: {result.status} ({result.response_time:.0f}ms)")
+                pass
         
         return results
     
     async def run_performance_tests(self) -> List[PerformanceBenchmark]:
         """Run performance tests on key endpoints"""
-        print('🚄 Running performance tests...')
+        pass
         
         performance_endpoints = [
             '/routes/health/check',
@@ -294,23 +294,23 @@ async def main():
     # Initialize test runner
     runner = ApiTestRunner(base_url)
     
-    print("🧪 TradingBait API Test Suite")
-    print("" + "=" * 30)
+    pass
+    pass
     
     try:
         # Run comprehensive test suite
         await runner.run_health_checks()
-        print()
+        pass
         
         await runner.run_critical_user_journeys()
-        print()
+        pass
         
         await runner.run_performance_tests()
-        print()
+        pass
         
         # Generate and display report
         report = runner.generate_report()
-        print(report)
+        pass
         
         # Get metrics for potential JSON export
         metrics = runner.get_metrics()
@@ -319,18 +319,18 @@ async def main():
         with open('test_results.json', 'w') as f:
             json.dump(metrics, f, indent=2)
         
-        print("📁 Test results saved to test_results.json")
+        pass
         
         # Exit with appropriate code
         if metrics['success_rate'] < 90:  # 90% success rate threshold
-            print("\n⚠️  Test suite failed - success rate below 90%")
+            pass
             sys.exit(1)
         else:
-            print("\n✅ All tests passed successfully!")
+            pass
             sys.exit(0)
             
     except Exception as e:
-        print(f"\n💥 Test suite encountered error: {e}")
+        pass
         sys.exit(1)
 
 if __name__ == "__main__":

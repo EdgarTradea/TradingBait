@@ -1,7 +1,8 @@
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pydantic import BaseModel
 from app.auth import AuthorizedUser
-import databutton as db
+from firebase_admin import storage, firestore
+from app.libs.firebase_init import initialize_firebase
 import re
 from typing import List, Optional
 import uuid
@@ -48,17 +49,23 @@ async def upload_image(user: AuthorizedUser, file: UploadFile = File(...)) -> Im
         # Generate unique image ID
         image_id = f"img_{uuid.uuid4().hex[:12]}"
         
-        # Create storage key with user ID and timestamp
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        storage_key = sanitize_storage_key(f"trading_images_{user.sub}_{timestamp}_{image_id}")
+        # Initialize Firebase and connect
+        initialize_firebase()
+        bucket = storage.bucket()
+        firestore_db = firestore.client()
         
-        # Store image in binary storage
-        db.storage.binary.put(storage_key, content)
+        # Store image in Firebase Storage
+        blob_path = f"images/{user.sub}/{image_id}"
+        blob = bucket.blob(blob_path)
+        blob.upload_from_string(content, content_type=file.content_type)
         
-        # Store metadata in JSON storage
+        # Generate a signed URL valid for a long time (or use download URL)
+        # Note: Frontend can also retrieve using standard getDownloadURL if requested.
+        
+        # Store metadata in Firestore
         metadata = {
             "image_id": image_id,
-            "storage_key": storage_key,
+            "blob_path": blob_path,
             "original_filename": file.filename,
             "content_type": file.content_type,
             "file_size": len(content),
@@ -66,8 +73,7 @@ async def upload_image(user: AuthorizedUser, file: UploadFile = File(...)) -> Im
             "user_id": user.sub
         }
         
-        metadata_key = sanitize_storage_key(f"image_metadata_{user.sub}_{image_id}")
-        db.storage.json.put(metadata_key, metadata)
+        firestore_db.collection(f"users/{user.sub}/images").document(image_id).set(metadata)
         
         return ImageUploadResponse(
             success=True,
@@ -80,7 +86,7 @@ async def upload_image(user: AuthorizedUser, file: UploadFile = File(...)) -> Im
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error uploading image: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to upload image")
 
 @router.get("/image/{image_id}")
@@ -88,8 +94,12 @@ async def get_image(image_id: str, user: AuthorizedUser):
     """Retrieve an uploaded image"""
     try:
         # Get metadata first
-        metadata_key = sanitize_storage_key(f"image_metadata_{user.sub}_{image_id}")
-        metadata = db.storage.json.get(metadata_key)
+        initialize_firebase()
+        firestore_db = firestore.client()
+        bucket = storage.bucket()
+        
+        doc = firestore_db.collection(f"users/{user.sub}/images").document(image_id).get()
+        metadata = doc.to_dict()
         
         if not metadata:
             raise HTTPException(status_code=404, detail="Image not found")
@@ -98,9 +108,10 @@ async def get_image(image_id: str, user: AuthorizedUser):
         if metadata.get("user_id") != user.sub:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Get image data
-        storage_key = metadata["storage_key"]
-        image_data = db.storage.binary.get(storage_key)
+        # Get image data from Firebase Storage
+        blob_path = metadata.get("blob_path", f"images/{user.sub}/{image_id}")
+        blob = bucket.blob(blob_path)
+        image_data = blob.download_as_bytes()
         
         from fastapi.responses import Response
         return Response(
@@ -114,7 +125,7 @@ async def get_image(image_id: str, user: AuthorizedUser):
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error retrieving image: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to retrieve image")
 
 @router.delete("/image/{image_id}")
@@ -122,30 +133,29 @@ async def delete_image(image_id: str, user: AuthorizedUser) -> ImageDeleteRespon
     """Delete an uploaded image"""
     try:
         # Get metadata first
-        metadata_key = sanitize_storage_key(f"image_metadata_{user.sub}_{image_id}")
+        initialize_firebase()
+        firestore_db = firestore.client()
+        bucket = storage.bucket()
         
-        try:
-            metadata = db.storage.json.get(metadata_key)
-        except:
+        doc_ref = firestore_db.collection(f"users/{user.sub}/images").document(image_id)
+        doc = doc_ref.get()
+        
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Image not found")
+            
+        metadata = doc.to_dict()
         
         # Verify ownership
         if metadata.get("user_id") != user.sub:
             raise HTTPException(status_code=403, detail="Access denied")
         
-        # Delete image data
-        storage_key = metadata["storage_key"]
-        try:
-            # Delete from storage (won't raise error if not found)
-            db.storage.binary.get(storage_key)  # Check if exists first
-            # If we get here, file exists, but we can't delete it directly
-            # For now, we'll just delete the metadata
-        except:
-            pass  # File doesn't exist, that's OK
-        
-        # Delete metadata (this effectively "deletes" the image)
-        # Note: We can't actually delete from storage, so we just remove metadata
-        # The actual file will remain but won't be accessible
+        # Delete image data and metadata
+        blob_path = metadata.get("blob_path", f"images/{user.sub}/{image_id}")
+        blob = bucket.blob(blob_path)
+        if blob.exists():
+            blob.delete()
+            
+        doc_ref.delete()
         
         return ImageDeleteResponse(
             success=True,
@@ -155,35 +165,31 @@ async def delete_image(image_id: str, user: AuthorizedUser) -> ImageDeleteRespon
     except HTTPException:
         raise
     except Exception as e:
-        print(f"Error deleting image: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to delete image")
 
 @router.get("/list")
 async def list_user_images(user: AuthorizedUser):
     """List all images uploaded by the user"""
     try:
-        # Get all storage files
-        all_metadata_files = db.storage.json.list()
+        initialize_firebase()
+        firestore_db = firestore.client()
+        
+        docs = firestore_db.collection(f"users/{user.sub}/images").stream()
         
         user_images = []
-        for file in all_metadata_files:
-            if file.name.startswith(f"image_metadata_{user.sub}_"):
-                try:
-                    metadata = db.storage.json.get(file.name)
-                    if metadata and metadata.get("user_id") == user.sub:
-                        user_images.append({
-                            "image_id": metadata["image_id"],
-                            "original_filename": metadata["original_filename"],
-                            "content_type": metadata["content_type"],
-                            "file_size": metadata["file_size"],
-                            "uploaded_at": metadata["uploaded_at"]
-                        })
-                except Exception as e:
-                    print(f"Error reading metadata file {file.name}: {e}")
-                    continue
+        for doc in docs:
+            metadata = doc.to_dict()
+            user_images.append({
+                "image_id": metadata.get("image_id"),
+                "original_filename": metadata.get("original_filename"),
+                "content_type": metadata.get("content_type"),
+                "file_size": metadata.get("file_size"),
+                "uploaded_at": metadata.get("uploaded_at")
+            })
         
         # Sort by upload date (newest first)
-        user_images.sort(key=lambda x: x["uploaded_at"], reverse=True)
+        user_images.sort(key=lambda x: x.get("uploaded_at", ""), reverse=True)
         
         return {
             "success": True,
@@ -192,5 +198,5 @@ async def list_user_images(user: AuthorizedUser):
         }
         
     except Exception as e:
-        print(f"Error listing images: {e}")
+        pass
         raise HTTPException(status_code=500, detail="Failed to list images")
