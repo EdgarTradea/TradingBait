@@ -81,3 +81,5 @@ temp/
 # yarn.lock
 # pnpm-lock.yaml
 # uv.lock
+.env
+firebase-admin-key.json
