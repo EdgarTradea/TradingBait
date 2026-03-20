@@ -15,7 +15,7 @@ def run_migration(data_file_path: str):
     
     db_firestore = firestore.client()
     
-    print(f"Retrieving db.storage keys from {data_file_path}...")
+    print(f"Reading exported data from {data_file_path}...")
     try:
         with open(data_file_path, 'r') as f:
             all_files = json.load(f)  # Expected format: {"trial_status.XYZ": {...}, "trial_usage.XYZ": {...}}

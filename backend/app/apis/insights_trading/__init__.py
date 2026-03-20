@@ -1,12 +1,16 @@
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from openai import OpenAI
 import json
 from datetime import datetime, timedelta
 from app.auth import AuthorizedUser
 import os
+
+# Initialize Firebase
+initialize_firebase()
 
 router = APIRouter(prefix="/insights/trading")
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -131,20 +135,23 @@ class PerformanceComparisonResponse(BaseModel):
 # ============================================================================
 
 def get_trading_data(user_id: str, days_back: int = 30) -> Dict[str, Any]:
-    """Get comprehensive trading data for analysis"""
+    """Get comprehensive trading data for analysis from Firestore"""
     try:
-        # Get trades data
-        trades_key = f"trades_{user_id}"
-        all_trades = db.storage.json.get(trades_key, default=[])
-        
-        # Filter by time period
+        db_firestore = firestore.client()
         cutoff_date = datetime.now() - timedelta(days=days_back)
         recent_trades = []
-        
-        for trade in all_trades:
-            trade_date = datetime.fromisoformat(trade.get('created_at', '2024-01-01T00:00:00'))
-            if trade_date >= cutoff_date:
-                recent_trades.append(trade)
+
+        for eval_doc in db_firestore.collection(f"users/{user_id}/evaluations").stream():
+            for trade_doc in db_firestore.collection(f"users/{user_id}/evaluations/{eval_doc.id}/trades").stream():
+                trade = trade_doc.to_dict()
+                if not trade:
+                    continue
+                try:
+                    trade_date = datetime.fromisoformat(trade.get('created_at', '2024-01-01T00:00:00'))
+                    if trade_date >= cutoff_date:
+                        recent_trades.append(trade)
+                except Exception:
+                    continue
         
         # Calculate basic metrics
         total_trades = len(recent_trades)
@@ -196,22 +203,25 @@ def get_trading_data(user_id: str, days_back: int = 30) -> Dict[str, Any]:
         }
 
 def get_journal_data(user_id: str, days_back: int = 30) -> List[Dict[str, Any]]:
-    """Get journal entries for behavioral correlation"""
+    """Get journal entries for behavioral correlation from Firestore"""
     try:
-        journal_key = f"journal_entries_{user_id}"
-        all_entries = db.storage.json.get(journal_key, default=[])
-        
-        # Filter by time period
+        db_firestore = firestore.client()
         cutoff_date = datetime.now() - timedelta(days=days_back)
         recent_entries = []
-        
-        for entry in all_entries:
-            entry_date = datetime.fromisoformat(entry.get('created_at', '2024-01-01T00:00:00'))
-            if entry_date >= cutoff_date:
-                recent_entries.append(entry)
-        
+
+        for doc in db_firestore.collection(f"users/{user_id}/journal_entries").stream():
+            entry = doc.to_dict()
+            if not entry:
+                continue
+            try:
+                entry_date = datetime.fromisoformat(entry.get('created_at', '2024-01-01T00:00:00'))
+                if entry_date >= cutoff_date:
+                    recent_entries.append(entry)
+            except Exception:
+                continue
+
         return recent_entries
-        
+
     except Exception as e:
         pass
         return []

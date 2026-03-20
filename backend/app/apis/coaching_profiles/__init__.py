@@ -1,14 +1,16 @@
-
-
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from fastapi import APIRouter
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from app.auth import AuthorizedUser
-import databutton as db
 import json
 from datetime import datetime
 from openai import OpenAI
 import os
+
+# Initialize Firebase
+initialize_firebase()
 
 router = APIRouter(prefix="/coaching-profiles")
 
@@ -73,29 +75,14 @@ class CoachingStyleRequest(BaseModel):
     user_context: Optional[str] = None
     recent_performance: Optional[Dict[str, Any]] = None
 
-# Storage helpers
-def get_trader_profile_key(user_id: str) -> str:
-    return f"trader_profile_{user_id}"
-
-def get_assessment_history_key(user_id: str) -> str:
-    return f"assessment_history_{user_id}"
-
-def sanitize_key(key: str) -> str:
-    """Sanitize storage key to only allow alphanumeric and ._- symbols"""
-    import re
-    return re.sub(r'[^a-zA-Z0-9._-]', '', key)
-
 # Assessment and Profile Creation
 @router.post("/assess-trader")
 async def assess_trader(request: TraderAssessmentRequest, user: AuthorizedUser) -> TraderProfile:
     """Create comprehensive trader assessment and generate personalized coaching profile"""
     try:
-        pass
-        
-        # Generate unique profile ID
+        db_firestore = firestore.client()
         profile_id = f"profile_{int(datetime.now().timestamp() * 1000)}"
-        
-        # Prepare assessment data
+
         assessment_data = {
             "experience": request.experience.dict(),
             "psychology": request.psychology.dict(),
@@ -103,17 +90,11 @@ async def assess_trader(request: TraderAssessmentRequest, user: AuthorizedUser) 
             "preferences": request.preferences.dict(),
             "additional_notes": request.additional_notes
         }
-        
-        # Generate AI analysis of the trader profile
+
         ai_analysis = await generate_trader_analysis(assessment_data)
-        
-        # Generate coaching recommendations
         coaching_recommendations = await generate_coaching_recommendations(assessment_data, ai_analysis)
-        
-        # Create development plan
         development_plan = await generate_development_plan(assessment_data, ai_analysis)
-        
-        # Create trader profile
+
         profile = TraderProfile(
             user_id=user.sub,
             profile_id=profile_id,
@@ -125,28 +106,19 @@ async def assess_trader(request: TraderAssessmentRequest, user: AuthorizedUser) 
             development_plan=development_plan,
             profile_version=1
         )
-        
-        # Store profile
-        profile_key = sanitize_key(get_trader_profile_key(user.sub))
-        db.storage.json.put(profile_key, profile.dict())
-        
-        # Store in assessment history
-        history_key = sanitize_key(get_assessment_history_key(user.sub))
-        try:
-            history = db.storage.json.get(history_key, default=[])
-        except:
-            history = []
-        
-        history.append({
+
+        # Store current profile
+        db_firestore.collection(f"users/{user.sub}/trader_profiles").document("current").set(profile.dict())
+
+        # Add to assessment history
+        db_firestore.collection(f"users/{user.sub}/assessment_history").document(profile_id).set({
             "profile_id": profile_id,
             "created_at": profile.created_at,
             "version": profile.profile_version
         })
-        db.storage.json.put(history_key, history)
-        
-        pass
+
         return profile
-        
+
     except Exception as e:
         pass
         raise
@@ -155,13 +127,14 @@ async def assess_trader(request: TraderAssessmentRequest, user: AuthorizedUser) 
 async def get_trader_profile(user: AuthorizedUser) -> Optional[TraderProfile]:
     """Get current trader profile for user"""
     try:
-        profile_key = sanitize_key(get_trader_profile_key(user.sub))
-        profile_data = db.storage.json.get(profile_key, default=None)
-        
+        db_firestore = firestore.client()
+        doc = db_firestore.collection(f"users/{user.sub}/trader_profiles").document("current").get()
+        profile_data = doc.to_dict()
+
         if profile_data:
             return TraderProfile(**profile_data)
         return None
-        
+
     except Exception as e:
         pass
         return None
@@ -170,36 +143,33 @@ async def get_trader_profile(user: AuthorizedUser) -> Optional[TraderProfile]:
 async def update_trader_profile(request: UpdateProfileRequest, user: AuthorizedUser) -> TraderProfile:
     """Update existing trader profile"""
     try:
-        profile_key = sanitize_key(get_trader_profile_key(user.sub))
-        current_profile_data = db.storage.json.get(profile_key)
-        
+        db_firestore = firestore.client()
+        doc_ref = db_firestore.collection(f"users/{user.sub}/trader_profiles").document("current")
+        doc = doc_ref.get()
+        current_profile_data = doc.to_dict()
+
         if not current_profile_data:
             raise ValueError("No existing profile found")
-        
+
         current_profile = TraderProfile(**current_profile_data)
-        
-        # Update profile data
+
         for key, value in request.updates.items():
             if hasattr(current_profile, key):
                 setattr(current_profile, key, value)
-        
-        # Update metadata
+
         current_profile.updated_at = datetime.now().isoformat()
         current_profile.profile_version += 1
-        
-        # Re-generate AI analysis if significant changes
+
         if any(key in ['experience', 'psychology', 'development'] for key in request.updates.keys()):
             current_profile.ai_analysis = await generate_trader_analysis(current_profile.assessment_data)
             current_profile.coaching_recommendations = await generate_coaching_recommendations(
                 current_profile.assessment_data, current_profile.ai_analysis
             )
-        
-        # Store updated profile
-        db.storage.json.put(profile_key, current_profile.dict())
-        
-        pass
+
+        doc_ref.set(current_profile.dict())
+
         return current_profile
-        
+
     except Exception as e:
         pass
         raise
@@ -208,28 +178,24 @@ async def update_trader_profile(request: UpdateProfileRequest, user: AuthorizedU
 async def get_personalized_coaching_style(request: CoachingStyleRequest, user: AuthorizedUser) -> Dict[str, Any]:
     """Generate personalized coaching style and content for session"""
     try:
-        # Get trader profile
-        profile_key = sanitize_key(get_trader_profile_key(user.sub))
-        profile_data = db.storage.json.get(profile_key, default=None)
-        
+        db_firestore = firestore.client()
+        doc = db_firestore.collection(f"users/{user.sub}/trader_profiles").document("current").get()
+        profile_data = doc.to_dict()
+
         if not profile_data:
-            # Return default coaching style if no profile
             return {
                 "communication_style": "supportive",
                 "session_intensity": "moderate",
                 "content_depth": "moderate",
                 "personalization_notes": "Using default coaching approach - consider completing trader assessment for personalized experience"
             }
-        
+
         profile = TraderProfile(**profile_data)
-        
-        # Generate personalized coaching approach
         coaching_style = await generate_personalized_coaching_approach(
             profile, request.session_type, request.user_context, request.recent_performance
         )
-        
         return coaching_style
-        
+
     except Exception as e:
         pass
         raise
@@ -238,24 +204,25 @@ async def get_personalized_coaching_style(request: CoachingStyleRequest, user: A
 async def get_development_areas(user: AuthorizedUser) -> Dict[str, Any]:
     """Get prioritized development areas and progress tracking"""
     try:
-        profile_key = sanitize_key(get_trader_profile_key(user.sub))
-        profile_data = db.storage.json.get(profile_key, default=None)
-        
+        db_firestore = firestore.client()
+        doc = db_firestore.collection(f"users/{user.sub}/trader_profiles").document("current").get()
+        profile_data = doc.to_dict()
+
         if not profile_data:
             return {
                 "areas": [],
                 "recommendations": "Complete trader assessment to identify development areas"
             }
-        
+
         profile = TraderProfile(**profile_data)
         development_areas = profile.development_plan.get("priority_areas", [])
-        
+
         return {
             "areas": development_areas,
             "current_focus": profile.development_plan.get("current_focus"),
             "progress_metrics": profile.development_plan.get("progress_metrics", {})
         }
-        
+
     except Exception as e:
         pass
         raise
@@ -293,7 +260,7 @@ Please provide analysis in the following JSON format:
 
 Provide detailed, actionable analysis based on trading psychology principles.
 """
-        
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -302,14 +269,12 @@ Provide detailed, actionable analysis based on trading psychology principles.
             ],
             temperature=0.7
         )
-        
+
         analysis_text = response.choices[0].message.content
-        
-        # Parse JSON response
+
         try:
             analysis = json.loads(analysis_text)
         except json.JSONDecodeError:
-            # Fallback if JSON parsing fails
             analysis = {
                 "trader_type": "Analysis Pending",
                 "psychological_profile": {"strengths": [], "vulnerabilities": [], "stress_patterns": ""},
@@ -317,9 +282,9 @@ Provide detailed, actionable analysis based on trading psychology principles.
                 "development_insights": {"immediate_priorities": [], "growth_potential": "", "warning_signs": []},
                 "coaching_notes": analysis_text
             }
-        
+
         return analysis
-        
+
     except Exception as e:
         pass
         return {"error": str(e)}
@@ -363,7 +328,7 @@ Provide recommendations in this JSON format:
 
 Focus on practical, actionable coaching strategies.
 """
-        
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -372,16 +337,16 @@ Focus on practical, actionable coaching strategies.
             ],
             temperature=0.7
         )
-        
+
         recommendations_text = response.choices[0].message.content
-        
+
         try:
             recommendations = json.loads(recommendations_text)
         except json.JSONDecodeError:
             recommendations = {"error": "Failed to parse recommendations", "raw_response": recommendations_text}
-        
+
         return recommendations
-        
+
     except Exception as e:
         pass
         return {"error": str(e)}
@@ -432,7 +397,7 @@ Provide a development plan in this JSON format:
 
 Create a realistic, achievable development plan.
 """
-        
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -441,16 +406,16 @@ Create a realistic, achievable development plan.
             ],
             temperature=0.7
         )
-        
+
         plan_text = response.choices[0].message.content
-        
+
         try:
             plan = json.loads(plan_text)
         except json.JSONDecodeError:
             plan = {"error": "Failed to parse development plan", "raw_response": plan_text}
-        
+
         return plan
-        
+
     except Exception as e:
         pass
         return {"error": str(e)}
@@ -486,7 +451,7 @@ Provide approach in this JSON format:
 
 Tailor the approach to this specific trader and session type.
 """
-        
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -495,9 +460,9 @@ Tailor the approach to this specific trader and session type.
             ],
             temperature=0.7
         )
-        
+
         approach_text = response.choices[0].message.content
-        
+
         try:
             approach = json.loads(approach_text)
         except json.JSONDecodeError:
@@ -507,9 +472,9 @@ Tailor the approach to this specific trader and session type.
                 "content_depth": profile.assessment_data.get('preferences', {}).get('content_depth', 'moderate'),
                 "personalization_notes": "Using profile preferences - AI approach generation failed"
             }
-        
+
         return approach
-        
+
     except Exception as e:
         pass
         return {"error": str(e)}

@@ -1,16 +1,15 @@
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, EmailStr
+from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
 from datetime import datetime, timedelta
 from app.auth import AuthorizedUser
-import databutton as db
-import re
+
+# Initialize Firebase
+initialize_firebase()
 
 router = APIRouter(prefix="/admin/early-access")
-
-def sanitize_storage_key(key: str) -> str:
-    """Sanitize storage key to only allow alphanumeric and ._- symbols"""
-    return re.sub(r'[^a-zA-Z0-9._-]', '', key)
 
 # Admin verification
 def verify_admin_access(user: AuthorizedUser):
@@ -21,10 +20,7 @@ def verify_admin_access(user: AuthorizedUser):
         "admin-user-id",  # Workspace admin user ID
         "admin-user"  # Current workspace user ID
     ]
-    pass
-    pass
     if user.sub not in admin_user_ids:
-        pass
         raise HTTPException(status_code=403, detail="Admin access required")
 
 # === DATA MODELS ===
@@ -53,48 +49,43 @@ class EarlyAccessResponse(BaseModel):
 # === ENDPOINTS ===
 
 @router.get("/signups")
-async def get_early_access_signups(
-    user: AuthorizedUser
-) -> EarlyAccessResponse:
+async def get_early_access_signups(user: AuthorizedUser) -> EarlyAccessResponse:
     """Get all early access signups (admin only)"""
     verify_admin_access(user)
-    
+
     try:
-        # Get all early access signups from storage
+        db_firestore = firestore.client()
         signups_data = []
-        
-        try:
-            # List all early access files
-            early_access_files = db.storage.json.list()
-            early_access_keys = [f.name for f in early_access_files if f.name.startswith('early_access_email_')]
-            
-            for key in early_access_keys:
-                try:
-                    signup_data = db.storage.json.get(key)
-                    if signup_data:
-                        signups_data.append(EarlyAccessSignup(**signup_data))
-                except Exception as e:
-                    pass
-                    continue
-                    
-        except Exception as e:
-            pass
-        
-        # Calculate stats
+
+        for doc in db_firestore.collection("early_access").stream():
+            try:
+                data = doc.to_dict()
+                if data:
+                    signups_data.append(EarlyAccessSignup(**{
+                        "email": data.get("email", doc.id),
+                        "signup_date": data.get("signup_date", ""),
+                        "confirmed": data.get("confirmed", False),
+                        "source": data.get("source", ""),
+                        "user_agent": data.get("user_agent"),
+                        "ip_address": data.get("ip_address"),
+                    }))
+            except Exception as e:
+                pass
+                continue
+
         total_signups = len(signups_data)
         confirmed_signups = len([s for s in signups_data if s.confirmed])
         confirmation_rate = (confirmed_signups / total_signups * 100) if total_signups > 0 else 0
-        
-        # Calculate time-based stats
+
         now = datetime.utcnow()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         week_start = today_start - timedelta(days=now.weekday())
         month_start = today_start.replace(day=1)
-        
+
         signups_today = 0
         signups_this_week = 0
         signups_this_month = 0
-        
+
         for signup in signups_data:
             try:
                 signup_date = datetime.fromisoformat(signup.signup_date.replace('Z', '+00:00'))
@@ -107,7 +98,7 @@ async def get_early_access_signups(
             except Exception as e:
                 pass
                 continue
-        
+
         stats = EarlyAccessStats(
             total_signups=total_signups,
             confirmed_signups=confirmed_signups,
@@ -116,94 +107,78 @@ async def get_early_access_signups(
             signups_this_week=signups_this_week,
             signups_this_month=signups_this_month
         )
-        
-        # Sort signups by date (newest first)
+
         signups_data.sort(key=lambda x: x.signup_date, reverse=True)
-        
+
         return EarlyAccessResponse(
             signups=signups_data,
             stats=stats,
             total_count=total_signups
         )
-        
+
     except Exception as e:
         pass
         raise HTTPException(status_code=500, detail=f"Failed to fetch signups: {str(e)}")
 
 @router.post("/export")
-async def export_early_access_signups(
-    user: AuthorizedUser
-) -> Dict[str, Any]:
+async def export_early_access_signups(user: AuthorizedUser) -> Dict[str, Any]:
     """Export early access signups as CSV data (admin only)"""
     verify_admin_access(user)
-    
+
     try:
-        # Get signups data
         signups_response = await get_early_access_signups(user)
         signups = signups_response.signups
-        
-        # Generate CSV content
+
         csv_lines = ["Email,Signup Date,Confirmed,Source,User Agent"]
-        
+
         for signup in signups:
-            # Format the signup data for CSV
             email = signup.email.replace(',', ' ')
             signup_date = signup.signup_date
             confirmed = "Yes" if signup.confirmed else "No"
             source = (signup.source or "").replace(',', ' ')
             user_agent = (signup.user_agent or "").replace(',', ' ')
-            
             csv_lines.append(f"{email},{signup_date},{confirmed},{source},{user_agent}")
-        
+
         csv_content = "\n".join(csv_lines)
-        
+
         return {
             "success": True,
             "csv_content": csv_content,
             "filename": f"early_access_signups_{datetime.utcnow().strftime('%Y%m%d_%H%M%S')}.csv",
             "total_records": len(signups)
         }
-        
+
     except Exception as e:
         pass
         raise HTTPException(status_code=500, detail=f"Failed to export signups: {str(e)}")
 
 @router.post("/mark-confirmed/{email}")
-async def mark_signup_confirmed(
-    email: str,
-    user: AuthorizedUser
-) -> Dict[str, Any]:
+async def mark_signup_confirmed(email: str, user: AuthorizedUser) -> Dict[str, Any]:
     """Manually mark an email as confirmed (admin only)"""
     verify_admin_access(user)
-    
+
     try:
-        # Find the signup record
-        # Convert email to the same format used in early_access_signup API
-        sanitized_email = email.lower().strip().replace('@', '_at_').replace('.', '_dot_')
-        storage_key = sanitize_storage_key(f"early_access_email_{sanitized_email}")
-        
-        try:
-            signup_data = db.storage.json.get(storage_key)
-            if not signup_data:
-                raise HTTPException(status_code=404, detail="Signup not found")
-        except FileNotFoundError:
+        db_firestore = firestore.client()
+        normalized_email = email.lower().strip()
+        doc_ref = db_firestore.collection("early_access").document(normalized_email)
+        doc = doc_ref.get()
+
+        if not doc.exists:
             raise HTTPException(status_code=404, detail="Signup not found")
-        
-        # Update confirmation status
-        signup_data['confirmed'] = True
-        signup_data['confirmed_by_admin'] = True
-        signup_data['admin_confirmed_at'] = datetime.utcnow().isoformat() + 'Z'
-        signup_data['admin_confirmed_by'] = user.sub
-        
-        # Save back to storage
-        db.storage.json.put(storage_key, signup_data)
-        
+
+        doc_ref.update({
+            "confirmed": True,
+            "confirmed_by_admin": True,
+            "admin_confirmed_at": datetime.utcnow().isoformat() + 'Z',
+            "admin_confirmed_by": user.sub
+        })
+
         return {
             "success": True,
             "message": f"Email {email} marked as confirmed",
             "email": email
         }
-        
+
     except HTTPException:
         raise
     except Exception as e:

@@ -1,12 +1,16 @@
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import List, Dict, Any, Optional
-import databutton as db
 from openai import OpenAI
 import json
 from datetime import datetime, timedelta
 from app.auth import AuthorizedUser
 import os
+
+# Initialize Firebase
+initialize_firebase()
 
 router = APIRouter(prefix="/insights/behavioral")
 client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
@@ -15,7 +19,6 @@ client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
 # BEHAVIORAL INSIGHTS - CONSOLIDATED AI ENDPOINT
 # ============================================================================
 
-# Consolidated system prompt for behavioral analysis
 BEHAVIORAL_ANALYST_SYSTEM_PROMPT = """
 You are an expert trading psychology specialist and behavioral analyst with deep expertise in:
 
@@ -133,89 +136,99 @@ class HabitFormationResponse(BaseModel):
 # ============================================================================
 
 def get_journal_data(user_id: str, days_back: int = 30) -> List[Dict[str, Any]]:
-    """Get journal entries for behavioral analysis"""
+    """Get journal entries for behavioral analysis from Firestore"""
     try:
-        journal_key = f"journal_entries_{user_id}"
-        all_entries = db.storage.json.get(journal_key, default=[])
-        
-        # Filter by time period
+        db_firestore = firestore.client()
         cutoff_date = datetime.now() - timedelta(days=days_back)
         recent_entries = []
-        
-        for entry in all_entries:
-            entry_date = datetime.fromisoformat(entry.get('created_at', '2024-01-01T00:00:00'))
-            if entry_date >= cutoff_date:
-                recent_entries.append(entry)
-        
+
+        for doc in db_firestore.collection(f"users/{user_id}/journal_entries").stream():
+            entry = doc.to_dict()
+            if not entry:
+                continue
+            try:
+                entry_date = datetime.fromisoformat(entry.get('created_at', '2024-01-01T00:00:00'))
+                if entry_date >= cutoff_date:
+                    recent_entries.append(entry)
+            except Exception:
+                continue
+
         return sorted(recent_entries, key=lambda x: x.get('created_at', ''), reverse=True)
-        
+
     except Exception as e:
         pass
         return []
 
 def get_habit_data(user_id: str, days_back: int = 30) -> List[Dict[str, Any]]:
-    """Get habit tracking data for analysis"""
+    """Get habit tracking data from Firestore"""
     try:
-        habit_key = f"habits_{user_id}"
-        all_habits = db.storage.json.get(habit_key, default=[])
-        
-        # Filter by time period and add completion data
+        db_firestore = firestore.client()
         cutoff_date = datetime.now() - timedelta(days=days_back)
         processed_habits = []
-        
-        for habit in all_habits:
+
+        for doc in db_firestore.collection(f"users/{user_id}/habits").stream():
+            habit = doc.to_dict()
+            if not habit:
+                continue
             habit_copy = habit.copy()
-            # Calculate recent completion rate
             completions = habit.get('completions', [])
-            recent_completions = [c for c in completions if datetime.fromisoformat(c) >= cutoff_date]
-            
+            recent_completions = []
+            for c in completions:
+                try:
+                    if datetime.fromisoformat(c) >= cutoff_date:
+                        recent_completions.append(c)
+                except Exception:
+                    continue
             habit_copy['recent_completion_rate'] = len(recent_completions) / days_back if days_back > 0 else 0
             habit_copy['recent_completions'] = len(recent_completions)
             processed_habits.append(habit_copy)
-        
+
         return processed_habits
-        
+
     except Exception as e:
         pass
         return []
 
 def get_trading_performance_correlation(user_id: str, days_back: int = 30) -> Dict[str, Any]:
-    """Get trading performance data for behavioral correlation"""
+    """Get trading performance data from Firestore for behavioral correlation"""
     try:
-        trades_key = f"trades_{user_id}"
-        all_trades = db.storage.json.get(trades_key, default=[])
-        
-        # Filter by time period
+        db_firestore = firestore.client()
         cutoff_date = datetime.now() - timedelta(days=days_back)
         recent_trades = []
-        
-        for trade in all_trades:
-            trade_date = datetime.fromisoformat(trade.get('created_at', '2024-01-01T00:00:00'))
-            if trade_date >= cutoff_date:
-                recent_trades.append(trade)
-        
-        # Calculate performance metrics
+
+        for eval_doc in db_firestore.collection(f"users/{user_id}/evaluations").stream():
+            for trade_doc in db_firestore.collection(f"users/{user_id}/evaluations/{eval_doc.id}/trades").stream():
+                trade = trade_doc.to_dict()
+                if not trade:
+                    continue
+                try:
+                    trade_date = datetime.fromisoformat(trade.get('created_at', '2024-01-01T00:00:00'))
+                    if trade_date >= cutoff_date:
+                        recent_trades.append(trade)
+                except Exception:
+                    continue
+
         if not recent_trades:
             return {'total_trades': 0, 'win_rate': 0, 'total_pnl': 0}
-        
+
         winning_trades = [t for t in recent_trades if float(t.get('pnl', 0)) > 0]
         total_pnl = sum(float(t.get('pnl', 0)) for t in recent_trades)
         win_rate = len(winning_trades) / len(recent_trades)
-        
+
         return {
             'total_trades': len(recent_trades),
             'win_rate': win_rate,
             'total_pnl': total_pnl,
             'avg_trade_size': total_pnl / len(recent_trades)
         }
-        
+
     except Exception as e:
         pass
         return {'total_trades': 0, 'win_rate': 0, 'total_pnl': 0}
 
 def create_behavioral_analysis_prompt(journal_data: List[Dict], habit_data: List[Dict], performance_data: Dict, analysis_type: str) -> str:
     """Create comprehensive behavioral analysis prompt"""
-    
+
     base_prompt = f"""
 Behavioral Analysis Request
 
@@ -227,22 +240,19 @@ Behavioral Analysis Request
 
 **Journal Sample (Recent):**
 """
-    
-    # Add recent journal entries
+
     for i, entry in enumerate(journal_data[:3]):
         content = entry.get('content', '')[:200]
         mood = entry.get('mood', 'N/A')
         base_prompt += f"\nEntry {i+1}: {content}... (Mood: {mood})"
-    
-    # Add habit information
+
     if habit_data:
         base_prompt += "\n\n**Habit Tracking:**\n"
         for habit in habit_data[:5]:
             name = habit.get('name', 'Unknown')
             completion_rate = habit.get('recent_completion_rate', 0)
             base_prompt += f"- {name}: {completion_rate:.1%} completion rate\n"
-    
-    # Add performance context
+
     base_prompt += f"""
 
 **Trading Context:**
@@ -250,7 +260,7 @@ Behavioral Analysis Request
 - Total P&L: ${performance_data.get('total_pnl', 0):,.2f}
 - Trade Volume: {performance_data.get('total_trades', 0)} trades
 """
-    
+
     if analysis_type == "comprehensive":
         return base_prompt + """
 
@@ -263,7 +273,7 @@ Provide comprehensive behavioral analysis including:
 
 Structure response with clear sections and actionable insights.
 """
-    
+
     elif analysis_type == "emotional":
         return base_prompt + """
 
@@ -274,7 +284,7 @@ Focus on emotional analysis:
 4. Provide specific emotional management techniques
 5. Create emotional awareness and regulation plan
 """
-    
+
     elif analysis_type == "habits":
         return base_prompt + """
 
@@ -285,7 +295,7 @@ Focus on habit pattern analysis:
 4. Optimize existing habits for better results
 5. Suggest new habits for trading psychology improvement
 """
-    
+
     elif analysis_type == "journal":
         return base_prompt + """
 
@@ -296,7 +306,7 @@ Focus on journal content analysis:
 4. Suggest journaling improvements
 5. Connect journal insights to trading behavior
 """
-    
+
     return base_prompt
 
 # ============================================================================
@@ -324,16 +334,12 @@ async def behavioral_insights_health_check():
 async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: AuthorizedUser) -> BehavioralAnalysisResponse:
     """Comprehensive behavioral pattern analysis"""
     user_id = user.sub
-    
+
     try:
-        pass
-        
-        # Get behavioral data
         journal_data = get_journal_data(user_id, request.time_period) if request.include_journal_analysis else []
         habit_data = get_habit_data(user_id, request.time_period) if request.include_habit_tracking else []
         performance_data = get_trading_performance_correlation(user_id, request.time_period)
-        
-        # Check data sufficiency
+
         total_data_points = len(journal_data) + len(habit_data)
         if total_data_points < 3:
             return BehavioralAnalysisResponse(
@@ -359,11 +365,9 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                 confidence_score=0.0,
                 next_assessment_date=(datetime.now() + timedelta(weeks=2)).isoformat()
             )
-        
-        # Create analysis prompt
+
         analysis_prompt = create_behavioral_analysis_prompt(journal_data, habit_data, performance_data, request.analysis_type)
-        
-        # Get AI analysis
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -373,16 +377,12 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
             temperature=0.4,
             max_tokens=2000
         )
-        
+
         ai_analysis = response.choices[0].message.content
-        
-        # Calculate confidence score
-        confidence_score = min(1.0, total_data_points / 10)  # Full confidence at 10+ data points
-        
-        # Create structured insights based on data
+        confidence_score = min(1.0, total_data_points / 10)
+
         emotional_insights = []
         if request.include_emotional_patterns and journal_data:
-            # Analyze mood patterns
             moods = [entry.get('mood', 'neutral') for entry in journal_data if entry.get('mood')]
             if moods:
                 mood_pattern = max(set(moods), key=moods.count)
@@ -394,8 +394,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                     intervention_strategy="Develop mood awareness and regulation techniques",
                     supporting_evidence=[f"Recorded in {len(moods)} journal entries"]
                 ))
-        
-        # Habit patterns analysis
+
         habit_patterns = []
         if request.include_habit_tracking and habit_data:
             for habit in habit_data:
@@ -403,16 +402,14 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                 habit_patterns.append(HabitPattern(
                     habit_name=habit.get('name', 'Unknown Habit'),
                     consistency_score=completion_rate,
-                    performance_correlation=0.3 if completion_rate > 0.7 else -0.1,  # Simplified correlation
+                    performance_correlation=0.3 if completion_rate > 0.7 else -0.1,
                     trend="improving" if completion_rate > 0.6 else "needs_attention",
                     behavioral_insight=f"{'Consistent' if completion_rate > 0.7 else 'Inconsistent'} habit execution",
                     optimization_suggestion="Maintain current approach" if completion_rate > 0.7 else "Identify and address completion barriers"
                 ))
-        
-        # Journal insights
+
         journal_insights = []
         if journal_data:
-            # Analyze journal content themes
             recent_themes = []
             for entry in journal_data[:5]:
                 content = entry.get('content', '').lower()
@@ -422,7 +419,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                     recent_themes.append('confidence')
                 if 'loss' in content or 'mistake' in content:
                     recent_themes.append('loss_processing')
-            
+
             if recent_themes:
                 top_theme = max(set(recent_themes), key=recent_themes.count)
                 journal_insights.append(JournalInsight(
@@ -433,10 +430,9 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                     action_recommendation="Develop targeted strategies for this area",
                     confidence="High" if len(recent_themes) > 3 else "Medium"
                 ))
-        
-        # Generate behavioral recommendations
+
         recommendations = []
-        
+
         if performance_data.get('win_rate', 0) < 0.5:
             recommendations.append(BehavioralRecommendation(
                 category="Performance Psychology",
@@ -450,7 +446,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                 expected_timeline="2-4 weeks",
                 success_metrics=["Increased win rate", "More consistent emotional state"]
             ))
-        
+
         if len(journal_data) < 10:
             recommendations.append(BehavioralRecommendation(
                 category="Self-Awareness",
@@ -464,9 +460,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
                 expected_timeline="1-2 weeks",
                 success_metrics=["Daily journal entries", "Enhanced self-awareness"]
             ))
-        
-        pass
-        
+
         return BehavioralAnalysisResponse(
             analysis_summary=f"Analyzed {len(journal_data)} journal entries and {len(habit_data)} habits over {request.time_period} days. {ai_analysis[:100]}..." if ai_analysis else f"Behavioral analysis of {total_data_points} data points shows areas for optimization",
             emotional_insights=emotional_insights,
@@ -482,7 +476,7 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
             confidence_score=confidence_score,
             next_assessment_date=(datetime.now() + timedelta(weeks=2)).isoformat()
         )
-        
+
     except Exception as e:
         pass
         raise HTTPException(status_code=500, detail=f"Error analyzing behavioral patterns: {str(e)}")
@@ -491,11 +485,8 @@ async def analyze_behavioral_patterns(request: BehavioralAnalysisRequest, user: 
 async def analyze_emotional_state(request: EmotionalStateRequest, user: AuthorizedUser) -> EmotionalStateResponse:
     """Analyze emotional state from conversation or text"""
     user_id = user.sub
-    
+
     try:
-        pass
-        
-        # Create emotional analysis prompt
         emotion_prompt = f"""
 Emotional State Analysis
 
@@ -516,8 +507,7 @@ Analyze the emotional state and provide:
 
 Focus on trading psychology and emotional regulation.
 """
-        
-        # Get AI emotional analysis
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -527,39 +517,34 @@ Focus on trading psychology and emotional regulation.
             temperature=0.3,
             max_tokens=800
         )
-        
+
         ai_analysis = response.choices[0].message.content
-        
-        # Parse emotional indicators from text
+
         text_lower = request.conversation_text.lower()
-        
-        # Simple emotion detection
+
         emotions = {
             'stressed': ['stress', 'anxious', 'worried', 'overwhelmed'],
             'frustrated': ['frustrated', 'angry', 'annoyed', 'upset'],
             'confident': ['confident', 'good', 'successful', 'winning'],
             'uncertain': ['unsure', 'confused', 'uncertain', 'doubt']
         }
-        
+
         detected_emotions = []
         for emotion, keywords in emotions.items():
             if any(keyword in text_lower for keyword in keywords):
                 detected_emotions.append(emotion)
-        
+
         primary_emotion = detected_emotions[0] if detected_emotions else 'neutral'
-        
-        # Estimate intensity based on language intensity
+
         intensity_keywords = ['very', 'extremely', 'really', 'so', 'quite', 'absolutely']
         intensity = 0.7 if any(word in text_lower for word in intensity_keywords) else 0.4
-        
-        # Estimate stress level
+
         stress_keywords = ['stress', 'pressure', 'anxious', 'worried', 'loss', 'mistake']
         stress_level = 0.8 if any(word in text_lower for word in stress_keywords) else 0.3
-        
-        # Estimate confidence
+
         confidence_keywords = ['confident', 'sure', 'good', 'successful', 'winning', 'right']
         confidence_level = 0.8 if any(word in text_lower for word in confidence_keywords) else 0.4
-        
+
         return EmotionalStateResponse(
             primary_emotion=primary_emotion,
             emotional_intensity=intensity,
@@ -585,7 +570,7 @@ Focus on trading psychology and emotional regulation.
                 "Continue with planned trading approach"
             ]
         )
-        
+
     except Exception as e:
         pass
         raise HTTPException(status_code=500, detail=f"Error analyzing emotional state: {str(e)}")
@@ -594,11 +579,8 @@ Focus on trading psychology and emotional regulation.
 async def create_habit_formation_plan(request: HabitFormationRequest, user: AuthorizedUser) -> HabitFormationResponse:
     """Create personalized habit formation plan"""
     user_id = user.sub
-    
+
     try:
-        pass
-        
-        # Create habit formation prompt
         habit_prompt = f"""
 Habit Formation Plan Request
 
@@ -616,8 +598,7 @@ Create a personalized habit formation plan including:
 
 Focus on trading psychology and performance improvement habits.
 """
-        
-        # Get AI habit formation plan
+
         response = client.chat.completions.create(
             model="gpt-4o-mini",
             messages=[
@@ -627,10 +608,9 @@ Focus on trading psychology and performance improvement habits.
             temperature=0.4,
             max_tokens=1200
         )
-        
+
         ai_plan = response.choices[0].message.content
-        
-        # Create structured habit plan
+
         habit_plan = {
             "goals": request.habit_goals,
             "implementation_approach": "Start small and build consistency",
@@ -638,7 +618,7 @@ Focus on trading psychology and performance improvement habits.
             "tracking_frequency": "Daily check-ins",
             "review_schedule": "Weekly progress reviews"
         }
-        
+
         implementation_strategy = [
             "Start with one habit and master it before adding others",
             "Use habit stacking - attach new habits to existing routines",
@@ -646,21 +626,21 @@ Focus on trading psychology and performance improvement habits.
             "Track completion immediately after performing the habit",
             "Celebrate small wins to reinforce positive behavior"
         ]
-        
+
         tracking_methods = [
             "Daily habit completion checklist",
             "Progress tracking in TradingBait habit module",
             "Weekly reflection on habit consistency",
             "Correlation tracking with trading performance"
         ]
-        
+
         milestone_schedule = [
             {"week": 1, "goal": "Establish daily routine", "success_metric": "5/7 days completion"},
             {"week": 2, "goal": "Build consistency", "success_metric": "6/7 days completion"},
             {"week": 4, "goal": "Habit automation", "success_metric": "7/7 days completion"},
             {"week": 8, "goal": "Performance correlation", "success_metric": "Measurable trading improvement"}
         ]
-        
+
         obstacle_management = [
             "Identify common disruption patterns and plan alternatives",
             "Prepare 'minimum viable habit' versions for difficult days",
@@ -668,7 +648,7 @@ Focus on trading psychology and performance improvement habits.
             "Plan habit recovery strategies after missed days",
             "Adjust habit parameters based on what's working"
         ]
-        
+
         return HabitFormationResponse(
             habit_plan=habit_plan,
             implementation_strategy=implementation_strategy,
@@ -676,9 +656,7 @@ Focus on trading psychology and performance improvement habits.
             milestone_schedule=milestone_schedule,
             obstacle_management=obstacle_management
         )
-        
+
     except Exception as e:
         pass
         raise HTTPException(status_code=500, detail=f"Error creating habit plan: {str(e)}")
-
-pass

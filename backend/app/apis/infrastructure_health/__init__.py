@@ -1,11 +1,16 @@
 """Infrastructure health monitoring API endpoints"""
 
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 from typing import Dict, Any, Optional
 from datetime import datetime
 from app.auth import AuthorizedUser
-import databutton as db
+import uuid
+
+# Initialize Firebase
+initialize_firebase()
 
 router = APIRouter(prefix="/infrastructure")
 
@@ -15,10 +20,12 @@ router = APIRouter(prefix="/infrastructure")
 class _InfrastructureMonitor:
     def log_subscription_verification_failure(self, details: dict):
         try:
-            key = "infra_subscription_failures"
-            failures = db.storage.json.get(key, default=[])
-            failures.append({**details, "timestamp": datetime.now().isoformat()})
-            db.storage.json.put(key, failures[-500:])  # keep last 500
+            db_firestore = firestore.client()
+            failure_id = str(uuid.uuid4())
+            db_firestore.collection("infrastructure_failures").document(failure_id).set({
+                **details,
+                "timestamp": datetime.now().isoformat()
+            })
         except Exception as e:
             pass
 
@@ -38,12 +45,13 @@ class _InfrastructureMonitor:
         issues: list = []
         warnings: list = []
         try:
-            db.storage.json.put("_health_probe", {"ts": start.isoformat()})
+            db_firestore = firestore.client()
+            db_firestore.collection("_health_probes").document("probe").set({"ts": start.isoformat()})
             storage_ok = True
         except Exception:
             storage_ok = False
             status = "degraded"
-            issues.append("db.storage write failed")
+            issues.append("Firestore write failed")
         ms = (datetime.now() - start).total_seconds() * 1000
         return {
             "overall_status": status,
@@ -87,7 +95,7 @@ async def get_infrastructure_health(user: AuthorizedUser) -> InfrastructureHealt
     try:
         health_summary = await infrastructure_monitor.run_comprehensive_health_check()
         return InfrastructureHealthResponse(**health_summary)
-        
+
     except Exception as e:
         pass
         raise HTTPException(status_code=500, detail=f"Failed to check infrastructure health: {str(e)}")
@@ -104,10 +112,10 @@ async def get_subscription_failure_stats(
     try:
         if hours < 1 or hours > 168:  # Max 1 week
             raise HTTPException(status_code=400, detail="Hours must be between 1 and 168")
-        
+
         stats = infrastructure_monitor.get_recent_failure_stats(hours)
         return SubscriptionFailureStats(**stats)
-        
+
     except HTTPException:
         raise
     except Exception as e:
@@ -132,14 +140,14 @@ async def log_subscription_failure(
             'userEmail': user.email,
             'additionalContext': request.additional_context or {}
         }
-        
+
         infrastructure_monitor.log_subscription_verification_failure(error_details)
-        
+
         return {
             'status': 'logged',
             'message': 'Subscription verification failure logged for monitoring'
         }
-        
+
     except Exception as e:
         pass
         raise HTTPException(status_code=500, detail=f"Failed to log failure: {str(e)}")
@@ -151,26 +159,23 @@ async def get_system_health() -> Dict[str, Any]:
     Returns basic system status without sensitive details.
     """
     try:
-        # Run a lightweight health check
         start_time = datetime.now()
-        
-        # Basic storage test
-        test_key = f"system_health_check_{start_time.strftime('%Y%m%d_%H%M')}"
+
+        db_firestore = firestore.client()
+        probe_id = f"system_health_check_{start_time.strftime('%Y%m%d_%H%M')}"
         test_data = {'timestamp': start_time.isoformat()}
-        
-        import databutton as db
-        db.storage.json.put(test_key, test_data)
-        retrieved = db.storage.json.get(test_key)
-        
+        db_firestore.collection("_health_probes").document(probe_id).set(test_data)
+        retrieved = db_firestore.collection("_health_probes").document(probe_id).get().to_dict()
+
         response_time = (datetime.now() - start_time).total_seconds() * 1000
-        
+
         return {
             'status': 'healthy' if retrieved == test_data else 'degraded',
             'timestamp': datetime.now().isoformat(),
             'response_time_ms': response_time,
             'version': '1.0.0'
         }
-        
+
     except Exception as e:
         pass
         return {

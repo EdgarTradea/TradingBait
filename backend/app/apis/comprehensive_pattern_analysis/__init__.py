@@ -9,9 +9,13 @@ from app.libs.advanced_pattern_recognition import (
 )
 from app.libs.trading_calculations import TradeData
 from app.libs.analytics_calculations import JournalEntry
-import databutton as db
+from firebase_admin import firestore
+from app.libs.firebase_init import initialize_firebase
 from datetime import datetime
 import os
+
+# Initialize Firebase
+initialize_firebase()
 
 router = APIRouter()
 
@@ -109,20 +113,23 @@ async def comprehensive_pattern_analysis_standalone(request: PatternAnalysisRequ
         # Get journal entries (if available)
         journal_entries = []
         try:
-            # Try to get journal entries from storage
-            journal_data = db.storage.json.get(f"journal_entries_{request.user_id}", default=[])
-            journal_entries = [JournalEntry(
-                user_id=entry.get('userId', request.user_id),
-                date=datetime.fromisoformat(entry.get('date', '').replace('Z', '+00:00')) if entry.get('date') else datetime.now(),
-                mood=entry.get('mood', 'neutral'),
-                energy_level=entry.get('energyLevel', 5),
-                confidence_level=entry.get('confidenceLevel', 5),
-                market_outlook=entry.get('marketOutlook', 'neutral'),
-                notes=entry.get('notes', ''),
-                habits_followed=entry.get('habitsFollowed', []),
-                lessons_learned=entry.get('lessonsLearned', ''),
-                tomorrow_focus=entry.get('tomorrowFocus', '')
-            ) for entry in journal_data]
+            db_firestore = firestore.client()
+            for doc in db_firestore.collection(f"users/{request.user_id}/journal_entries").stream():
+                entry = doc.to_dict()
+                if not entry:
+                    continue
+                journal_entries.append(JournalEntry(
+                    user_id=entry.get('userId', request.user_id),
+                    date=datetime.fromisoformat(entry.get('date', '').replace('Z', '+00:00')) if entry.get('date') else datetime.now(),
+                    mood=entry.get('mood', 'neutral'),
+                    energy_level=entry.get('energyLevel', 5),
+                    confidence_level=entry.get('confidenceLevel', 5),
+                    market_outlook=entry.get('marketOutlook', 'neutral'),
+                    notes=entry.get('notes', ''),
+                    habits_followed=entry.get('habitsFollowed', []),
+                    lessons_learned=entry.get('lessonsLearned', ''),
+                    tomorrow_focus=entry.get('tomorrowFocus', '')
+                ))
         except Exception as e:
             pass
             journal_entries = []
@@ -241,8 +248,6 @@ async def pattern_recognition_health():
     try:
         # Test OpenAI connection
         from openai import OpenAI
-        import databutton as db
-        
         client = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"))
         
         # Simple test call
