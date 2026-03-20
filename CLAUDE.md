@@ -1,92 +1,220 @@
-# TradingBait – Claude Code Context
+# TradingBait — Claude Code Workspace
+
+This file is automatically loaded at the start of every Claude Code session. It is the single source of truth for how Claude should understand and operate within this project.
+
+---
 
 ## Project Overview
-Full-stack trading journal app. React/TypeScript frontend, Python/FastAPI backend, Firestore database.
 
-## Migration: db.storage → Firestore (Tier 3) — COMPLETE
+TradingBait is a trading journal and performance analytics SaaS for professional traders. Core loop: import trades → journal → get AI-driven insights. Subscription-based with Stripe billing and a trial flow.
 
-All `db.storage` (Databutton) calls are being replaced with Firebase/Firestore equivalents.
-
-### Firebase Init Pattern
-```python
-from firebase_admin import firestore
-from app.libs.firebase_init import initialize_firebase
-
-initialize_firebase()
-db_firestore = firestore.client()
-```
-
-### Common Firestore Patterns
-```python
-# Get document
-doc = db_firestore.collection("collection").document(doc_id).get()
-data = doc.to_dict()  # None if not found
-
-# Set document
-db_firestore.collection("collection").document(doc_id).set(data)
-
-# Update document
-db_firestore.collection("collection").document(doc_id).update({"field": value})
-
-# Delete document
-db_firestore.collection("collection").document(doc_id).delete()
-
-# Query
-results = db_firestore.collection("collection").where(
-    filter=firestore.FieldFilter("field", "==", value)
-).stream()
-
-# Stream all docs
-for doc in db_firestore.collection("collection").stream():
-    data = doc.to_dict()
-```
-
-### Collection Structure
-- `discount_codes/{discount_id}` — discount records
-- `discount_codes_deleted/{discount_id}` — soft-deleted discounts (audit trail)
-- `early_access/{email}` — early access signups (email as doc ID)
-- `ai_coach_notifications/{email}` — AI coach notification signups
-- `subscriptions/{user_id}` — admin-managed subscription records
-- `infrastructure_failures/{uuid}` — logged subscription verification failures
-- `_health_probes/{id}` — infrastructure health check probes
-- `analytics_events/{date}/events/{uuid}` — user activity events by date
-- `analytics_metrics/{date}` — pre-computed daily user metrics
-- `users/{user_id}/trader_profiles/current` — coaching profiles
-- `users/{user_id}/assessment_history/{profile_id}` — assessment history
-- `users/{user_id}/journal_entries/{date}` — journal entries (canonical path)
-- `users/{user_id}/habits/{id}` — habit tracking data
-- `users/{user_id}/evaluations/{eval_id}/trades/{trade_id}` — trades
+| | |
+|---|---|
+| **Repository** | https://github.com/EdgarTradea/TradingBait |
+| **Firebase Project** | trade-pulse-6970e |
+| **Frontend** | React + TypeScript + Vite |
+| **Backend** | Python + FastAPI (60+ API modules) |
+| **Database** | Firebase Firestore |
+| **Auth** | Firebase Authentication |
+| **File Storage** | Firebase Cloud Storage |
+| **Payments** | Stripe |
+| **AI** | Claude API (Anthropic) |
 
 ---
 
-## Migration Status — ALL TIER 3 COMPLETE ✅
+## Current Priority
 
-| Module | Calls | Status |
-|--------|-------|--------|
-| discount_management | 17 | ✅ Done |
-| historical_analytics | 10 | ✅ Done |
-| coaching_profiles | 8 | ✅ Done |
-| infrastructure_health | 6 | ✅ Done |
-| early_access_signup | 6 | ✅ Done |
-| libs/journal_migration | 5 | ✅ Done |
-| admin_early_access | 4 | ✅ Done |
-| insights_behavioral | 3 | ✅ Done |
-| ai_coach_notifications | 3 | ✅ Done |
-| admin | 3 | ✅ Done |
-| trial_migration_script | 2 | ✅ Done (was already Firestore; string ref cleaned) |
-| insights_trading | 2 | ✅ Done |
-| journal_migration (api) | 1 | ✅ Done (already retired stub) |
-| journal_cleanup | 1 | ✅ Done (already retired stub) |
-| comprehensive_pattern_analysis | 1 | ✅ Done |
-
-**Remaining db.storage references (NOT Tier 3):**
-- `app/internal/dbapi.py` — internal Databutton plumbing, not a Tier 3 target
-- `app/internal/mw/auth_mw.py` — references `databutton_app_state`, not db.storage
+1. **Complete Tier 3 migration** — 12 remaining modules still on db.storage
+2. **Set up environment variables** — .env file with all API keys
+3. **Run locally and test** — verify core features work end to end
+4. **Deploy to Firebase Hosting**
+5. **Implement AI coaching layer** — Karl, Sophie, Marcus
 
 ---
 
-## Notes
-- `sanitize_storage_key()` helpers are no longer needed after migration — remove them.
-- No separate index collections needed; use Firestore queries on `code` field instead.
-- Soft deletes: move doc to `*_deleted` collection, then delete from original.
-- Already-migrated reference modules: `pattern_analysis`, `trade_management`, `file_analysis`.
+## Migration Status
+
+### Done
+- Tier 1 (8 core modules) — fully migrated to Firestore
+- Tier 2 (15 secondary modules) — fully migrated to Firestore
+- cTrader dead code — fully removed
+- 81 debug print statements — removed
+- 41 silent UI errors — replaced with toast notifications
+- Static assets — bundled into frontend
+
+### Tier 3 — Remaining (db.storage references)
+These must be migrated to Firestore:
+
+| Module | Calls | Notes |
+|--------|-------|-------|
+| infrastructure_health | 5 | Internal health monitoring |
+| ai_coach_notifications | 3 | AI coach notification signups |
+| comprehensive_pattern_analysis | 1 | Deep pattern detection |
+| early_access_signup | 6 | Early access waitlist |
+| admin_early_access | 4 | Admin early access view |
+| admin | 3 | General admin panel |
+| historical_analytics | 10 | Historical P&L charts |
+| insights_behavioral | 3 | Behavioral pattern insights |
+| insights_trading | 2 | Trading performance insights |
+| discount_management | 17 | Promo/discount codes |
+| coaching_profiles | 8 | AI coach persona profiles |
+| libs/journal_migration.py | 5 | Journal migration library |
+
+---
+
+## Firestore Structure
+
+```
+users/{userId}
+  -- preferences/
+  -- subscription/
+     -- trial
+     -- usage
+     -- stripe
+  -- habits/
+  -- moods/
+  -- journal/{date}
+  -- weekly_intentions/{week_start_date}
+  -- evaluations/{evalId}/trades/
+  -- coaching_sessions/
+  -- educational_content/
+  -- ai_parse_results/
+  -- audit_log/
+  -- gdpr_audit/
+  -- data_exports/
+  -- admin_audit/
+  -- review_schedule/
+     -- weekly
+     -- monthly
+
+system/health_check
+system/connectivity_test
+system/trial_health
+support_tickets/{id}
+traffic_summaries/{date}_{hour}
+traffic_detailed/{date}_{hour}
+traffic_sessions/{date}_{hour}
+screenshots/{userId}/files/{id}
+journal_entries/{userId}/entries/{date}
+```
+
+---
+
+## AI Coaching Layer
+
+Three specialised agents with distinct personalities. System prompts are fully designed — implementation pending.
+
+| Agent | Role | Personality | Data Access |
+|-------|------|-------------|-------------|
+| Karl | Pre-session prep + debrief | Direct, serious, process-driven | Everything |
+| Sophie | Emotional processing | Warm, soft, listener | Profile, sessions, Marcus logs, journal |
+| Marcus | Life context logger | Calm, neutral | Profile + coaching tone only |
+
+Implementation checklist:
+- [ ] Migrate coaching_profiles to Firestore (Tier 3)
+- [ ] Replace JournalCoachingPanel.tsx generic insights with three Claude API calls
+- [ ] Wire Karl, Sophie, Marcus system prompts to backend
+- [ ] Connect six data variables to Karl
+- [ ] Connect five variables to Sophie (no trading data)
+- [ ] Connect Marcus LOG_COMPLETE signal to Firestore write
+
+---
+
+## Development Rules
+
+### Before making any change
+- Read the relevant file first — understand what it does before touching it
+- Explain the cause of any bug before fixing it
+- Propose the approach for new features before writing code
+- List every file that will be modified before making changes
+- Wait for explicit approval before executing
+
+### Migration rules
+- Always verify with grep that db.storage references are actually gone after each migration
+- Never assume a migration is complete — confirm with a search
+- Firestore paths must follow the existing users/{userId}/... schema
+- No logic changes during migration — only the storage layer changes
+
+### Autohealing rules
+- When an error occurs, diagnose the root cause before attempting a fix
+- Never apply the same fix twice — if it didn't work, find a different approach
+- If a migration breaks something, roll back and report before trying again
+- Always check for and remove dead helper functions left behind after migration (sanitize_storage_key, get_user_*_key patterns)
+- Always remove unused imports after removing the code that used them
+
+### Critical protection rules — ALWAYS confirm before touching these
+- Stripe billing code (stripe_webhooks, stripe_integration, user_billing)
+- Firebase Auth flows (auth.ts, auth_mw.py, UserGuard)
+- Any file that modifies or deletes user data
+- Any schema changes to existing Firestore collections
+
+### Code quality rules
+- No bloated files — flag anything over 1000 lines before editing
+- No hardcoded user IDs or API keys
+- Always handle loading and error states in UI components
+- Never remove existing functionality unless explicitly instructed
+- Remove debug print() statements whenever encountered
+
+---
+
+## Slash Commands
+
+### /prime
+Run at the start of every session. Claude will:
+1. Read this CLAUDE.md
+2. Check current migration status
+3. Summarise what's done, what's remaining, and what the next task is
+4. Confirm readiness to proceed
+
+### /status
+Report current state:
+- Which Tier 3 modules are migrated vs remaining
+- Any known issues or blockers
+- Next recommended action
+
+### /migrate [module_name]
+Migrate a specific db.storage module to Firestore:
+1. Read the current file
+2. List all db.storage calls and their Firestore equivalents
+3. Identify dead code to remove
+4. Wait for approval
+5. Execute and verify with grep
+
+### /verify
+Run a full grep scan across the codebase and report:
+- Any remaining db.storage references
+- Any remaining import databutton statements
+- Any remaining print() debug statements
+
+### /deploy
+Walk through the deployment checklist:
+1. Verify environment variables are set
+2. Run frontend build
+3. Run backend dependency check
+4. Deploy to Firebase Hosting
+5. Verify the deployed app is live
+
+---
+
+## Environment Variables Required
+
+Never commit these to GitHub. Set in .env file.
+
+| Variable | Purpose |
+|----------|---------|
+| FIREBASE_ADMIN_SDK_CREDENTIALS | Backend Firebase Admin SDK |
+| FIREBASE_CLIENT_CONFIG | Frontend Firebase Web SDK |
+| ANTHROPIC_API_KEY | Claude API for Karl, Sophie, Marcus |
+| STRIPE_SECRET_KEY | Stripe subscriptions and billing |
+| STRIPE_WEBHOOK_SECRET | Verifying Stripe webhook payloads |
+| SMTP_HOST / PORT / USER / PASS | Welcome and support emails |
+
+---
+
+## Session Workflow
+
+1. Run /prime to load context and confirm current state
+2. Use /migrate [module] for Tier 3 migrations
+3. Use /verify after each migration batch to confirm clean state
+4. Commit to GitHub after each completed tier or major change
+5. Use /deploy when ready to go live
