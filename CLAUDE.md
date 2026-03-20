@@ -24,41 +24,25 @@ TradingBait is a trading journal and performance analytics SaaS for professional
 
 ## Current Priority
 
-1. **Complete Tier 3 migration** — 12 remaining modules still on db.storage
-2. **Set up environment variables** — .env file with all API keys
-3. **Run locally and test** — verify core features work end to end
-4. **Deploy to Firebase Hosting**
-5. **Implement AI coaching layer** — Karl, Sophie, Marcus
+1. **Set up environment variables** — .env file with all API keys
+2. **Run locally and test** — verify core features work end to end
+3. **Deploy to Firebase Hosting**
+4. **Implement AI coaching layer** — Karl, Sophie, Marcus
 
 ---
 
 ## Migration Status
 
-### Done
+### Done — db.storage fully removed ✅
 - Tier 1 (8 core modules) — fully migrated to Firestore
 - Tier 2 (15 secondary modules) — fully migrated to Firestore
+- Tier 3 (15 remaining modules) — fully migrated to Firestore (completed 2026-03-20)
 - cTrader dead code — fully removed
 - 81 debug print statements — removed
 - 41 silent UI errors — replaced with toast notifications
 - Static assets — bundled into frontend
 
-### Tier 3 — Remaining (db.storage references)
-These must be migrated to Firestore:
-
-| Module | Calls | Notes |
-|--------|-------|-------|
-| infrastructure_health | 5 | Internal health monitoring |
-| ai_coach_notifications | 3 | AI coach notification signups |
-| comprehensive_pattern_analysis | 1 | Deep pattern detection |
-| early_access_signup | 6 | Early access waitlist |
-| admin_early_access | 4 | Admin early access view |
-| admin | 3 | General admin panel |
-| historical_analytics | 10 | Historical P&L charts |
-| insights_behavioral | 3 | Behavioral pattern insights |
-| insights_trading | 2 | Trading performance insights |
-| discount_management | 17 | Promo/discount codes |
-| coaching_profiles | 8 | AI coach persona profiles |
-| libs/journal_migration.py | 5 | Journal migration library |
+**No db.storage references remain in any API module.** Only `app/internal/dbapi.py` and `app/internal/mw/auth_mw.py` retain Databutton internal plumbing — these are not migrated modules.
 
 ---
 
